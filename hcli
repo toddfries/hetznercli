@@ -1,0 +1,106 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2017 Todd T. Fries <todd@fries.net>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use strict;
+use warnings;
+
+use JSON;
+use LWP::UserAgent;
+
+use Data::Dumper;
+
+STDERR->autoflush(1);
+STDOUT->autoflush(1);
+
+my $ua = LWP::UserAgent->new();
+$ua->env_proxy(1);
+$ua->timeout(20);
+
+my $json = JSON->new->allow_nonref;
+
+my $conf = $ENV{'HOME'}."/.hcli.conf";
+
+our $opt_v = 0;
+
+our $huser;
+our $hpass;
+
+eval `cat $conf`;
+
+if (!defined($huser) || !defined($hpass)) {
+	die "need huser and hpass defined in $conf";
+}
+
+$ua->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
+
+my $URL = "https://robot-ws.your-server.de/order/server_market/product?search=Ent&min_memory_size=48&max_price=35";
+
+
+my $req = HTTP::Request->new(GET => $URL);
+
+my $res = $ua->request( $req );
+
+my $text = $res->content_ref;
+
+print "OUTPUT:\n";
+
+
+my $parsed = parse_json(${$text}, "robot-ws");
+#print recurse_dump($parsed);
+#print "\n\n";
+
+foreach my $server ( @{$parsed} ) {
+
+	printf "%2d %6d %4s %5d %4d %3d %6.2f %d\n",
+		$server->{product}->{datacenter},
+		$server->{product}->{id},
+		$server->{product}->{name},
+		$server->{product}->{cpu_benchmark},
+		$server->{product}->{hdd_count} * $server->{product}->{hdd_size},
+		$server->{product}->{memory_size},
+		$server->{product}->{price},
+		$server->{product}->{next_reduce};
+}
+
+sub parse_json {
+	my ($str,$name) = @_;
+
+	my $parsed;
+	eval {
+		$parsed = $json->decode( $str );
+	};
+	if ($@) {
+		die("%s: json->decode('%s') Error %s\n", $name, $str, $@);
+		return undef;
+	}
+	if ($opt_v > 0) {
+		printf "Pretty %s: %s\n", $name, $json->pretty->encode( $parsed )."\n";;
+	}
+	return $parsed;
+}
+
+
+sub recurse_dump {
+        my ($item) = @_;
+        my $d = Data::Dumper->new([$item]);
+        $d->Purity(1);
+        $d->Terse(0);
+        $d->Deepcopy(1);
+        $d->Indent(2);
+        $d->Sortkeys(1);
+        #$d->Deparse(1);
+	return $d->Dump();
+}
