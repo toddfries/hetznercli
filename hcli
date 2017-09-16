@@ -17,10 +17,10 @@
 use strict;
 use warnings;
 
+use Data::Dumper;
+use Getopt::Std;
 use JSON;
 use LWP::UserAgent;
-
-use Data::Dumper;
 
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
@@ -31,10 +31,18 @@ $ua->timeout(20);
 
 my $json = JSON->new->allow_nonref;
 
-my $conf = $ENV{'HOME'}."/.hcli.conf";
 
 our $opt_v = 0;
+our $opt_c = $ENV{'HOME'}."/.hcli.conf";
 
+# filter options
+our $opt_C = 5682;
+our $opt_D = 4096;
+our $opt_M = 48;
+
+getopts('c:vC:D:M:');
+
+my $conf = $opt_c;
 our $huser;
 our $hpass;
 
@@ -46,7 +54,14 @@ if (!defined($huser) || !defined($hpass)) {
 
 $ua->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
 
-my $URL = "https://robot-ws.your-server.de/order/server_market/product?search=Ent&min_memory_size=48&max_price=35";
+my $URL = "https://robot-ws.your-server.de/order/server_market/product?search=Ent";
+
+if (defined($opt_C)) {
+	$URL .= "&min_cpu_benchmark=${opt_C}"
+}
+if (defined($opt_M)) {
+	$URL .= "&min_memory_size=${opt_M}"
+}
 
 
 my $req = HTTP::Request->new(GET => $URL);
@@ -62,17 +77,39 @@ my $parsed = parse_json(${$text}, "robot-ws");
 #print recurse_dump($parsed);
 #print "\n\n";
 
+printf "%8s %7s %5s %5s %5s %3s %6s %6s %3s %6s\n",
+	"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
 foreach my $server ( @{$parsed} ) {
 
-	printf "%2d %6d %4s %5d %4d %3d %6.2f %d\n",
-		$server->{product}->{datacenter},
+	my $dc   = $server->{product}->{datacenter};
+	my $mem  = $server->{product}->{memory_size};
+	my $cpub = $server->{product}->{cpu_benchmark};
+	my $disk = $server->{product}->{hdd_count} * $server->{product}->{hdd_size};
+
+	if ($cpub < $opt_C) {
+		next;
+	}
+	if ($mem < $opt_M) {
+		next;
+	}
+	if ($disk < $opt_D) {
+		next;
+	}
+	my $traffic = $server->{product}->{traffic};
+	$traffic =~ s/ TB$//;
+	$dc =~ s/-DC/-/;
+
+	printf "%8s %7d %5s %5d %5d %3d %6.2f %6d %3s %s\n",
+		$dc,
 		$server->{product}->{id},
 		$server->{product}->{name},
-		$server->{product}->{cpu_benchmark},
-		$server->{product}->{hdd_count} * $server->{product}->{hdd_size},
+		$cpub,
+		$disk,
 		$server->{product}->{memory_size},
 		$server->{product}->{price},
-		$server->{product}->{next_reduce};
+		$server->{product}->{next_reduce},
+		$traffic,
+		$server->{product}->{cpu},
 }
 
 sub parse_json {
