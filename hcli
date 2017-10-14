@@ -22,12 +22,10 @@ use Getopt::Std;
 use JSON;
 use LWP::UserAgent;
 
+use WWW::Hetzner;
+
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
-
-my $ua = LWP::UserAgent->new();
-$ua->env_proxy(1);
-$ua->timeout(20);
 
 my $json = JSON->new->allow_nonref;
 
@@ -46,13 +44,7 @@ my $conf = $opt_c;
 our $huser;
 our $hpass;
 
-eval `cat $conf`;
-
-if (!defined($huser) || !defined($hpass)) {
-	die "need huser and hpass defined in $conf";
-}
-
-$ua->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
+my $hetzner = WWW::Hetzner->new($conf);
 
 my $URL = "https://robot-ws.your-server.de/order/server_market/product?search=Ent";
 
@@ -63,12 +55,7 @@ if (defined($opt_M)) {
 	$URL .= "&min_memory_size=${opt_M}"
 }
 
-
-my $req = HTTP::Request->new(GET => $URL);
-
-my $res = $ua->request( $req );
-
-my $text = $res->content_ref;
+my $text = $hetzner->req($URL);
 
 print "OUTPUT:\n";
 
