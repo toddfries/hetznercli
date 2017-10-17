@@ -18,6 +18,8 @@ use strict;
 use warnings;
 
 use LWP::UserAgent;
+use HTTP::Request;
+use JSON;
 
 our $huser;
 our $hpass;
@@ -29,7 +31,7 @@ sub new {
 	
 	$me->{ua} = LWP::UserAgent->new();
 	$me->{ua}->env_proxy(1);
-	$me->{ua}->timeout(20);
+	$me->{ua}->timeout(60);
 
 	eval `cat $conf`;
 
@@ -39,19 +41,55 @@ sub new {
 
 	$me->{ua}->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
 
+	$me->{json} = JSON->new->allow_nonref;
+	$me->{URLBASE} = "https://robot-ws.your-server.de/";
+
 	bless $me, $class;
 }
 
 sub req {
-	my ($me, $URL) = @_;
+	my ($me, $call) = @_;
 
-	my $req = HTTP::Request->new(GET => $URL);
+	my $url = $me->{URLBASE}.$call;
+	
+	my $req = HTTP::Request->new(GET => $url);
+
+	if (!defined($req)) {
+		return "EINVAL URL: $url";
+	}
 
 	my $res = $me->{ua}->request( $req );
 
-	my $text = $res->content_ref;
+	if (!defined($res)) {
+		return "EBADF result URL='$url'";
+	}
+	#if (! $res->is_success) {
+	#	return $res->status_line;
+	#}
 
-	return $text;
+	return $me->parse_json( $res, "robot-ws");
+}
+
+sub parse_json {
+	my ($me, $res, $name) = @_;
+
+	my $str = $res->content;
+	if (ref($str) ne "") {
+		$str = $res->content_ref;
+	}
+
+	my $parsed;
+	#printf "%s: json->decode( '%s' ) .. pre\n", $name, $str;
+
+	eval {
+		$parsed = $me->{json}->decode( $str );
+	};
+	if ($@) {
+		die(sprintf("%s: json->decode('%s') Error %s\n", $name,
+		    $str, $@
+));
+	}
+	return $parsed;
 }
 
 1;

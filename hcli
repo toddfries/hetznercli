@@ -21,14 +21,15 @@ use Data::Dumper;
 use Getopt::Std;
 use JSON;
 use LWP::UserAgent;
+use URI::Escape qw( uri_escape_utf8 );
 
 use WWW::Hetzner;
+use WWW::Hetzner::Server;
 
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
 
 my $json = JSON->new->allow_nonref;
-
 
 our $opt_v = 0;
 our $opt_c = $ENV{'HOME'}."/.hcli.conf";
@@ -41,26 +42,102 @@ our $opt_M = 48;
 getopts('c:vC:D:M:');
 
 my $conf = $opt_c;
-our $huser;
-our $hpass;
 
 my $hetzner = WWW::Hetzner->new($conf);
 
-my $URL = "https://robot-ws.your-server.de/order/server_market/product?search=Ent";
+if (0) {
+
+my $call = "ip";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(1) {
+my $call = "server";
+my $parsed = $hetzner->req($call);
+foreach my $s (@{$parsed}) {
+	my $ip = $s->{server}->{server_ip};
+	#printf "server ip: %s\n", $ip;
+	my $srvr = WWW::Hetzner::Server->new($hetzner, $ip);
+	my @sub = @{$srvr->get('subnet')};
+	printf "%12s: %s %15s %s/%s\n",
+		$srvr->get('server_name'),
+		$srvr->get('paid_until'),
+		$srvr->get('server_ip'),
+		$sub[0]->{ip},
+		$sub[0]->{mask},
+	;
+	$srvr->traffic;
+	#my $fire = $srvr->firewall;
+	#print recurse_dump($fire);
+}
+#print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "subnet";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "rdns";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "key";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "order/server/product";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "storagebox";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "order/server/transaction";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "order/server_market/transaction";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "traffic";
+my $type="month";
+my $from=uri_escape_utf8("2017-01-01");
+my $to=uri_escape_utf8("2017-12-31");
+$call .= "?type=$type";
+$call .= "&from=$from";
+$call .= "&to=$to";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+my $call = "rdns";
+my $parsed = $hetzner->req($call);
+print recurse_dump($parsed);
+
+} elsif(0) {
+
+my $call = "order/server_market/product?search=Ent";
 
 if (defined($opt_C)) {
-	$URL .= "&min_cpu_benchmark=${opt_C}"
+	$call .= "&min_cpu_benchmark=${opt_C}"
 }
 if (defined($opt_M)) {
-	$URL .= "&min_memory_size=${opt_M}"
+	$call .= "&min_memory_size=${opt_M}"
 }
-
-my $text = $hetzner->req($URL);
 
 print "OUTPUT:\n";
 
 
-my $parsed = parse_json(${$text}, "robot-ws");
+my $parsed = $hetzner->req($call);
 #print recurse_dump($parsed);
 #print "\n\n";
 
@@ -98,24 +175,7 @@ foreach my $server ( @{$parsed} ) {
 		$traffic,
 		$server->{product}->{cpu},
 }
-
-sub parse_json {
-	my ($str,$name) = @_;
-
-	my $parsed;
-	eval {
-		$parsed = $json->decode( $str );
-	};
-	if ($@) {
-		die("%s: json->decode('%s') Error %s\n", $name, $str, $@);
-		return undef;
-	}
-	if ($opt_v > 0) {
-		printf "Pretty %s: %s\n", $name, $json->pretty->encode( $parsed )."\n";;
-	}
-	return $parsed;
 }
-
 
 sub recurse_dump {
         my ($item) = @_;
