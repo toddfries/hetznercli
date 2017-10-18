@@ -33,25 +33,21 @@ my $json = JSON->new->allow_nonref;
 
 our $opt_v = 0;
 our $opt_c = $ENV{'HOME'}."/.hcli.conf";
+our $opt_p;
 
-# filter options
-our $opt_C = 5682;
-our $opt_D = 4096;
-our $opt_M = 48;
-
-getopts('c:vC:D:M:');
+getopts('c:p:v');
 
 my $conf = $opt_c;
 
 my $hetzner = WWW::Hetzner->new($conf);
 
-if (0) {
+if ($opt_p eq "ip") {
 
 my $call = "ip";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(1) {
+} elsif($opt_p eq "server") {
 my $call = "server";
 my $parsed = $hetzner->req($call);
 foreach my $s (@{$parsed}) {
@@ -86,42 +82,42 @@ foreach my $s (@{$parsed}) {
 }
 #print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "subnet") {
 my $call = "subnet";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "rdns") {
 my $call = "rdns";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "sshkey") {
 my $call = "key";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "products") {
 my $call = "order/server/product";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "storagebox") {
 my $call = "storagebox";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "server_transactions") {
 my $call = "order/server/transaction";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "market_transactions") {
 my $call = "order/server_market/transaction";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
+} elsif($opt_p eq "traffic") {
 my $call = "traffic";
 my $type="month";
 my $from=uri_escape_utf8("2017-01-01");
@@ -132,12 +128,14 @@ $call .= "&to=$to";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif(0) {
-my $call = "rdns";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
+} elsif($opt_p eq "market_search") {
 
-} elsif(0) {
+# filter options
+our $opt_C = 5682;
+our $opt_D = 4096;
+our $opt_M = 48;
+
+getopts('C:D:M:');
 
 my $call = "order/server_market/product?search=Ent";
 
@@ -189,6 +187,13 @@ foreach my $server ( @{$parsed} ) {
 		$traffic,
 		$server->{product}->{cpu},
 }
+} else {
+	my $p = $opt_p;
+	if (!defined($p)) {
+		$p = "<undef>";
+	}
+	printf "personality '%s' not found\n", $p;
+	exit(1);
 }
 
 sub recurse_dump {
