@@ -17,74 +17,59 @@ package WWW::Hetzner::Server;
 use strict;
 use warnings;
 
+use parent 'WWW::Hetzner::API';
+
 use WWW::Hetzner;
+use WWW::Hetzner::IP;
+use WWW::Hetzner::traffic;
 
-sub new {
-	my ($class, $hetzner, $ip) = @_;
-
-	if (!defined($hetzner)) {
-		die("1st arg 'hetzner' is undef, bailing\n");
-	}
-	#print "\$hetzner is a ".ref($hetzner)."\n";
-	if (!defined($ip)) {
-		die("2nd arg 'ip' is undef, bailing\n");
-	}
-
-	my $me = { };
-	
-	$me->{hetzner} = $hetzner;
-
-	my $bret = bless $me, $class;
-
-	$me->set('ip',$ip);
+sub init {
+	my ($me, $ip) = @_;
+	$me->{setoverrides}->{ip} = sub {
+		my ($me, $ip) = @_;
+		if (ref($ip) eq "ARRAY" && $#{$ip} > 0) {
+		printf "ip override passed a %s('%s') and a %s('%s')\n",
+			ref($me),$me,ref($ip),$ip; 
+			foreach my $i (@{$ip}) {
+				printf "ip override IP array member %s\n", $i;
+			}
+			exit(1);
+		}
+		if (ref($ip) eq "ARRAY") {
+			$ip = ${$ip}[0];
+		}
+		my $lip = WWW::Hetzner::IP->new($me->{hetzner},$ip);
+		$me->{ip} = $lip;
+	};
+	$me->{setoverrides}->{_trafficbw} = sub {
+		my ($me, $ip) = @_;
+		if (ref($ip) eq "ARRAY" && $#{$ip} > 0) {
+		printf "traffic override passed a %s('%s') and a %s('%s')\n",
+			ref($me),$me,ref($ip),$ip; 
+			foreach my $i (@{$ip}) {
+				printf "traffic override IP array member %s\n", $i;
+			}
+			exit(1);
+		}
+		if (ref($ip) eq "ARRAY") {
+			$ip = ${$ip}[0];
+		}
+		my $traffic = WWW::Hetzner::traffic->new($me->{hetzner},$ip);
+		$me->{_trafficbw} = $traffic;
+	};
+	$me->{call} = "server/$ip";
+	$me->{dname} = "server";
 	$me->refresh;
-
-	return $bret;
-}
-
-sub set {
-	my ($me, $var, $val) = @_;
-	my $oval = $me->get($var);
-	if (!defined($oval)) {
-		$oval="<undef>";
-	}
-	#printf "%s: %s -> %s\n", $var, $oval, $val;
-
-	$me->{$var} = $val;
-}
-
-sub get {
-	my ($me, $var) = @_;
-	return $me->{$var};
-}
-
-sub refresh {
-	my ($me) = @_;
-	my $parsed = $me->{hetzner}->req("server/".$me->get('ip'));
-
-	if (ref($parsed) eq "") {
-		printf "server/%s: %s\n", $me->get('ip'), $parsed;
-	}
-	foreach my $var (keys %{$parsed->{server}}) {
-		my $val = $parsed->{server}->{$var};
-		#printf "refresh '%s' = '%s'\n", $var, $val;
-		$me->set($var, $val);
-	}
 }
 
 sub traffic {
 	my ($me) = @_;
 	my $ip = $me->get('server_ip');
-	my $parsed = $me->{hetzner}->req("traffic?type=month&from=2017-10-01&to=2017-10-31&ip=${ip}");
-
-	if (!defined($parsed->{traffic}->{data}->{$ip}->{in})) {
-		return;
+	if (!defined($me->{_trafficbw})) {
+		#printf "%s->traffic: set('traffic',%s)\n", ref($me), $ip;
+		$me->set('_trafficbw',$ip);
 	}
-	my $in  = $parsed->{traffic}->{data}->{$ip}->{in};
-	my $out = $parsed->{traffic}->{data}->{$ip}->{out};
-	my $sum = $parsed->{traffic}->{data}->{$ip}->{sum};
-	printf "               traffic in/out/sum = %s/%s/%s\n", $in,$out,$sum;
-	return ($in,$out,$sum);
+	return $me->{_trafficbw}->ios;
 }
 
 sub firewall {

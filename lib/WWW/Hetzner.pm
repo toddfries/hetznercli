@@ -77,6 +77,14 @@ sub parse_json {
 	if (ref($str) ne "") {
 		$str = $res->content_ref;
 	}
+	if (!defined($str)) {
+		printf "%s has undef str\n", $name;
+		return undef;
+	}
+	if (length($str) < 1) {
+		printf "%s has empty str\n", $name;
+		return undef;
+	}
 
 	my $parsed;
 	#printf "%s: json->decode( '%s' ) .. pre\n", $name, $str;

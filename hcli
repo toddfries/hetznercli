@@ -59,14 +59,28 @@ foreach my $s (@{$parsed}) {
 	#printf "server ip: %s\n", $ip;
 	my $srvr = WWW::Hetzner::Server->new($hetzner, $ip);
 	my @sub = @{$srvr->get('subnet')};
-	printf "%12s: %s %15s %s/%s\n",
+	printf "%d %12s: %s\n",
+		$srvr->get('server_number'),
 		$srvr->get('server_name'),
 		$srvr->get('paid_until'),
-		$srvr->get('server_ip'),
+	;
+	my $server_ip = $srvr->get('server_ip');
+	my $server_gw = $srvr->get('ip')->get('gateway');
+	if (!defined($server_gw)) {
+		$server_gw = "<undef>";
+	}
+	printf "\t%15s gw %15s\n",
+		$server_ip,
+		$server_gw,
+	;
+	printf "\t%s/%s\n",
 		$sub[0]->{ip},
 		$sub[0]->{mask},
 	;
-	$srvr->traffic;
+	my ($i,$o,$s) = $srvr->traffic;
+	if (defined($i) && defined($o) && defined($s)) {
+		printf "\ttraffic in/out/sum = %f/%f/%f\n", $i, $o, $s;
+	}
 	#my $fire = $srvr->firewall;
 	#print recurse_dump($fire);
 }
