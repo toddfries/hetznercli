@@ -47,7 +47,7 @@ my $call = "ip";
 my $parsed = $hetzner->req($call);
 print recurse_dump($parsed);
 
-} elsif($opt_p eq "server") {
+} elsif($opt_p eq "servers") {
 my $call = "server";
 my $parsed = $hetzner->req($call);
 foreach my $s (@{$parsed}) {
@@ -76,6 +76,10 @@ foreach my $s (@{$parsed}) {
 	my ($i,$o,$s) = $srvr->traffic;
 	if (defined($i) && defined($o) && defined($s)) {
 		printf "\ttraffic in/out/sum = %f/%f/%f\n", $i, $o, $s;
+	}
+	my $ptr = $srvr->rdns;
+	if (defined($ptr)) {
+		printf "\trdns %s ptr %s\n", $server_ip, $ptr;
 	}
 	#my $fire = $srvr->firewall;
 	#print recurse_dump($fire);

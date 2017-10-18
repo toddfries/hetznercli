@@ -22,6 +22,7 @@ use parent 'WWW::Hetzner::API';
 use WWW::Hetzner;
 use WWW::Hetzner::IP;
 use WWW::Hetzner::traffic;
+use WWW::Hetzner::rdns;
 
 sub init {
 	my ($me, $ip) = @_;
@@ -57,6 +58,22 @@ sub init {
 		my $traffic = WWW::Hetzner::traffic->new($me->{hetzner},$ip);
 		$me->{_trafficbw} = $traffic;
 	};
+	$me->{setoverrides}->{_rdns} = sub {
+		my ($me, $ip) = @_;
+		if (ref($ip) eq "ARRAY" && $#{$ip} > 0) {
+		printf "rdns override passed a %s('%s') and a %s('%s')\n",
+			ref($me),$me,ref($ip),$ip; 
+			foreach my $i (@{$ip}) {
+				printf "rdns override IP array member %s\n", $i;
+			}
+			exit(1);
+		}
+		if (ref($ip) eq "ARRAY") {
+			$ip = ${$ip}[0];
+		}
+		my $rdns = WWW::Hetzner::rdns->new($me->{hetzner},$ip);
+		$me->{_rdns} = $rdns;
+	};
 	$me->{call} = "server/$ip";
 	$me->{dname} = "server";
 	$me->refresh;
@@ -70,6 +87,16 @@ sub traffic {
 		$me->set('_trafficbw',$ip);
 	}
 	return $me->{_trafficbw}->ios;
+}
+
+sub rdns {
+	my ($me) = @_;
+	my $ip = $me->get('server_ip');
+	if (!defined($me->{_rdns})) {
+		#printf "%s->rdns: set('rdns',%s)\n", ref($me), $ip;
+		$me->set('_rdns',$ip);
+	}
+	return $me->{_rdns}->get('ptr');
 }
 
 sub firewall {
