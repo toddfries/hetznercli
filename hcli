@@ -81,6 +81,15 @@ foreach my $s (@{$parsed}) {
 	if (defined($ptr)) {
 		printf "\trdns %s ptr %s\n", $server_ip, $ptr;
 	}
+	my $cancel = $srvr->cancel;
+	if (defined($cancel)) {
+		printf "\tcancel earliest %s, status %s, date %s, reason %s\n",
+			$cancel->get('earliest_cancellation_date'),
+			$cancel->get('cancelled'),
+			$cancel->get('cancellation_date'),
+			$cancel->get('cancellation_reason'),
+		;
+	}
 	#my $fire = $srvr->firewall;
 	#print recurse_dump($fire);
 }

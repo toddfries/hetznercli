@@ -23,6 +23,7 @@ use WWW::Hetzner;
 use WWW::Hetzner::IP;
 use WWW::Hetzner::traffic;
 use WWW::Hetzner::rdns;
+use WWW::Hetzner::cancellation;
 
 sub init {
 	my ($me, $ip) = @_;
@@ -74,6 +75,22 @@ sub init {
 		my $rdns = WWW::Hetzner::rdns->new($me->{hetzner},$ip);
 		$me->{_rdns} = $rdns;
 	};
+	$me->{setoverrides}->{_cancel} = sub {
+		my ($me, $ip) = @_;
+		if (ref($ip) eq "ARRAY" && $#{$ip} > 0) {
+		printf "cancel override passed a %s('%s') and a %s('%s')\n",
+			ref($me),$me,ref($ip),$ip; 
+			foreach my $i (@{$ip}) {
+				printf "cancel override IP array member %s\n", $i;
+			}
+			exit(1);
+		}
+		if (ref($ip) eq "ARRAY") {
+			$ip = ${$ip}[0];
+		}
+		my $cancel = WWW::Hetzner::cancellation->new($me->{hetzner},$ip);
+		$me->{_cancel} = $cancel;
+	};
 	$me->{call} = "server/$ip";
 	$me->{dname} = "server";
 	$me->refresh;
@@ -97,6 +114,16 @@ sub rdns {
 		$me->set('_rdns',$ip);
 	}
 	return $me->{_rdns}->get('ptr');
+}
+
+sub cancel {
+	my ($me) = @_;
+	my $ip = $me->get('server_ip');
+	if (!defined($me->{_cancel})) {
+		#printf "%s->cancel: set('cancel',%s)\n", ref($me), $ip;
+		$me->set('_cancel',$ip);
+	}
+	return $me->{_cancel};
 }
 
 sub firewall {
