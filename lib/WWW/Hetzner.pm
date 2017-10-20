@@ -21,9 +21,6 @@ use LWP::UserAgent;
 use HTTP::Request;
 use JSON;
 
-our $huser;
-our $hpass;
-
 sub new {
 	my ($class, $conf) = @_;
 
@@ -32,11 +29,17 @@ sub new {
 	$me->{ua} = LWP::UserAgent->new();
 	$me->{ua}->env_proxy(1);
 	$me->{ua}->timeout(60);
+	$me->{cfile} = $conf;
 
-	eval `cat $conf`;
+	bless $me, $class;
+
+	$me->loadconf;
+
+	my $huser = $me->{config}->{huser};
+	my $hpass = $me->{config}->{hpass};
 
 	if (!defined($huser) || !defined($hpass)) {
-		die "need huser and hpass defined in $conf";
+		die("need huser and hpass defined in config file: $conf");
 	}
 
 	$me->{ua}->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
@@ -44,7 +47,7 @@ sub new {
 	$me->{json} = JSON->new->allow_nonref;
 	$me->{URLBASE} = "https://robot-ws.your-server.de/";
 
-	bless $me, $class;
+	return $me;
 }
 
 sub req {
@@ -98,6 +101,34 @@ sub parse_json {
 ));
 	}
 	return $parsed;
+}
+
+sub loadconf {
+	my ($me) = @_;
+	my $conf = $me->{cfile};
+
+	if (! -f $conf) {
+		die("config file '$conf' does not exist");
+	}
+	if (!open(C,$conf)) {
+		die("could not open $conf");
+	}
+	my $line;
+	while(<C>) {
+		if (/^\s*$/ || /^\s*#/) {
+			next;
+		}
+		chomp($line=$_);
+		if ($line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/) {
+			my ($var,$val) = ($1, $2);
+			printf "loadconf found '%s' = '%s'\n", $var, $val;
+
+			$me->{config}->{$var}=$val;
+			next;
+		}
+		printf "Unhandled config line: %s\n", $line;
+	}
+	close(C);
 }
 
 1;
