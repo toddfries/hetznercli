@@ -121,7 +121,7 @@ sub loadconf {
 		chomp($line=$_);
 		if ($line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/) {
 			my ($var,$val) = ($1, $2);
-			printf "loadconf found '%s' = '%s'\n", $var, $val;
+			#printf "loadconf found '%s' = '%s'\n", $var, $val;
 
 			$me->{config}->{$var}=$val;
 			next;

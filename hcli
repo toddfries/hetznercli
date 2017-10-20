@@ -83,12 +83,22 @@ foreach my $s (@{$parsed}) {
 	}
 	my $cancel = $srvr->cancel;
 	if (defined($cancel)) {
-		printf "\tcancel earliest %s, status %s, date %s, reason %s\n",
+		printf "\tcancel earliest %s, status %s, ",
 			$cancel->get('earliest_cancellation_date'),
 			$cancel->get('cancelled'),
-			$cancel->get('cancellation_date'),
-			$cancel->get('cancellation_reason'),
 		;
+		my $cdate = $cancel->get('cancellation_date');
+		if ($cdate ne "<undef>") {
+			printf "date %s, ", $cdate;
+		}
+		my $reason = $cancel->get('cancellation_reason');
+		if (ref($reason) eq "ARRAY") {
+			print "reasons [";
+			foreach my $r (@{$reason}) {
+				printf "'%s',", $r;
+			}
+			print "]\n";
+		}
 	}
 	#my $fire = $srvr->firewall;
 	#print recurse_dump($fire);
