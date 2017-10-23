@@ -14,24 +14,30 @@
 
 package WWW::Hetzner;
 
-use strict;
-use warnings;
+use Moose; # turns on strict/warnings
 
-use LWP::UserAgent;
 use HTTP::Request;
 use JSON;
+use LWP::UserAgent;
+use MooseX::Params::Validate;
 
-sub new {
-	my ($class, $conf) = @_;
+our $VERSION = '0.00000001';
 
-	my $me = { };
-	
+has 'cfile' => (is => 'rw', isa => 'Str', required => 1);
+
+around 'new' => sub {
+	my $orig = shift;
+	my $me = shift;
+
+	my $nme = $me->$orig(@_);
+	if (!defined($nme)) {
+		return $nme;
+	}
+	$me = $nme;
+
 	$me->{ua} = LWP::UserAgent->new();
 	$me->{ua}->env_proxy(1);
 	$me->{ua}->timeout(60);
-	$me->{cfile} = $conf;
-
-	bless $me, $class;
 
 	$me->loadconf;
 
@@ -39,16 +45,16 @@ sub new {
 	my $hpass = $me->{config}->{hpass};
 
 	if (!defined($huser) || !defined($hpass)) {
-		die("need huser and hpass defined in config file: $conf");
+		die("need huser and hpass defined in config file: ".$me->cfile);
 	}
 
-	$me->{ua}->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
+	$nme->{ua}->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
 
 	$me->{json} = JSON->new->allow_nonref;
 	$me->{URLBASE} = "https://robot-ws.your-server.de/";
 
 	return $me;
-}
+};
 
 sub req {
 	my ($me, $call) = @_;
@@ -105,7 +111,7 @@ sub parse_json {
 
 sub loadconf {
 	my ($me) = @_;
-	my $conf = $me->{cfile};
+	my $conf = $me->cfile;
 
 	if (! -f $conf) {
 		die("config file '$conf' does not exist");

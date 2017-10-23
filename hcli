@@ -39,7 +39,7 @@ getopts('c:p:v');
 
 my $conf = $opt_c;
 
-my $hetzner = WWW::Hetzner->new($conf);
+my $hetzner = WWW::Hetzner->new(cfile => $conf);
 
 if ($opt_p eq "ip") {
 
