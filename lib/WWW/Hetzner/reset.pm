@@ -12,7 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-package WWW::Hetzner::cancellation;
+package WWW::Hetzner::reset;
 
 use Moose;
 
@@ -21,8 +21,8 @@ extends 'WWW::Hetzner::API';
 sub init {
 	my ($me) = @_;
 	my $ip = $me->ip;
-	$me->{call} = "server/${ip}/cancellation";
-	$me->{dname} = "cancellation";
+	$me->{call} = "reset";
+	$me->{dname} = "reset";
 	$me->refresh;
 }
 

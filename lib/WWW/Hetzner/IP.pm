@@ -14,15 +14,13 @@
 
 package WWW::Hetzner::IP;
 
-use strict;
-use warnings;
+use Moose;
 
-use parent 'WWW::Hetzner::API';
-
-use WWW::Hetzner;
+extends 'WWW::Hetzner::API';
 
 sub init {
-	my ($me, $ip) = @_;
+	my ($me) = @_;
+	my $ip = $me->ip;
 	$me->{call} = "ip/$ip";
 	$me->{dname} = "ip";
 	$me->refresh;

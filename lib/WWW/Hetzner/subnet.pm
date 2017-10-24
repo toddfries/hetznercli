@@ -14,16 +14,15 @@
 
 package WWW::Hetzner::subnet;
 
-use strict;
-use warnings;
+use Moose;
 
-use parent 'WWW::Hetzner::API';
+extends 'WWW::Hetzner::API';
 
 use WWW::Hetzner;
 
 sub init {
-	my ($me, $ip) = @_;
-	$me->set('ip', $ip);
+	my ($me) = @_;
+	my $ip = $me->ip;
 	$me->{call} = "subnet/${ip}";
 	$me->{dname} = "subnet";
 	$me->refresh;

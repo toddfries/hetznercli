@@ -15,44 +15,26 @@
 # generic API class 'parent'
 package WWW::Hetzner::API;
 
-use strict;
-use warnings;
+use Moose;
+use Moose::Util::TypeConstraints;
 
 use WWW::Hetzner;
 
-sub new {
-	my ($class, $hetzner, $ip) = @_;
+has 'hetzner' => (is => 'rw', isa => 'WWW::Hetzner', required => 1);
+has 'ip' => (is => 'rw', isa => 'Str', required => 1);
 
-	#printf "api %s new ip=%s\n", $class, $ip;
+around 'new' => sub {
+	my $orig = shift;
+	my $me = shift;
 
-	if (!defined($hetzner)) {
-		die("1st arg 'hetzner' is undef, bailing\n");
-	}
-	if (!defined($ip)) {
-		die("2nd arg 'ip' is undef, bailing\n");
-	}
-	if (ref($ip) ne "") {
-		printf "api %s new passed ip parm as a %s\n",
-			$class, ref($ip);
-		exit(1);
-	}
-
-	my $me = { };
-	
-	$me->{hetzner} = $hetzner;
-	$me->{class} = $class;
-
-	my $b = bless $me, $class;
-
-	$me->init($ip);
-
-	return $b;
-}
+	my $nme = $me->$orig(@_);
+	$nme->init;
+	return $nme;
+};
 
 sub init {
-	my ($me, $ip) = @_;
+	my ($me) = @_;
 
-	$me->set('ip', $ip);
 	$me->refresh;
 }
 
@@ -73,12 +55,12 @@ sub set {
 	#printf "api %s %s: %s -> %s\n", ref($me), $var, $oval, $val;
 
 
-	$me->{$var} = $val;
+	$me->{v}->{$var} = $val;
 }
 
 sub get {
 	my ($me, $var) = @_;
-	return $me->{$var};
+	return $me->{v}->{$var};
 }
 
 sub refresh {
@@ -86,7 +68,7 @@ sub refresh {
 	if (!defined($me->{call})) {
 		return;
 	}
-	my $parsed = $me->{hetzner}->req($me->{call});
+	my $parsed = $me->hetzner->req($me->{call});
 	if (!defined($parsed)) {
 		printf "api %s refresh %s call returned <undef>\n",
 			ref($me),

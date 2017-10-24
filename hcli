@@ -19,8 +19,6 @@ use warnings;
 
 use Data::Dumper;
 use Getopt::Std;
-use JSON;
-use LWP::UserAgent;
 use URI::Escape qw( uri_escape_utf8 );
 
 use WWW::Hetzner;
@@ -29,8 +27,6 @@ use WWW::Hetzner::Server;
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
 
-my $json = JSON->new->allow_nonref;
-
 our $opt_v = 0;
 our $opt_c = $ENV{'HOME'}."/.hcli.conf";
 our $opt_p;
@@ -38,8 +34,35 @@ our $opt_p;
 getopts('c:p:v');
 
 my $conf = $opt_c;
+my $config = { };
 
-my $hetzner = WWW::Hetzner->new(cfile => $conf);
+if (! -f $conf) {
+	die("config file '$conf' does not exist");
+}
+if (!open(C,$conf)) {
+	die("could not open $conf");
+}
+my $line;
+while(<C>) {
+	if (/^\s*$/ || /^\s*#/) {
+		next;
+	}
+	chomp($line=$_);
+	if ($line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/) {
+		my ($var,$val) = ($1, $2);
+		#printf "loadconf found '%s' = '%s'\n", $var, $val;
+
+		$config->{$var}=$val;
+		next;
+	}
+	printf "Unhandled config line: %s\n", $line;
+}
+close(C);
+
+my $hetzner = WWW::Hetzner->new(
+	huser => $config->{huser},
+	hpass => $config->{hpass},
+);
 
 if ($opt_p eq "ip") {
 
@@ -53,7 +76,7 @@ my $parsed = $hetzner->req($call);
 foreach my $s (@{$parsed}) {
 	my $ip = $s->{server}->{server_ip};
 	#printf "server ip: %s\n", $ip;
-	my $srvr = WWW::Hetzner::Server->new($hetzner, $ip);
+	my $srvr = WWW::Hetzner::Server->new(hetzner => $hetzner, ip => $ip);
 	my @sub = @{$srvr->get('subnet')};
 	printf "%d %12s: %s\n",
 		$srvr->get('server_number'),
@@ -102,6 +125,25 @@ foreach my $s (@{$parsed}) {
 	}
 	#my $fire = $srvr->firewall;
 	#print recurse_dump($fire);
+}
+#print recurse_dump($parsed);
+
+} elsif($opt_p eq "reset") {
+my $call = "reset";
+my $parsed = $hetzner->req($call);
+foreach my $r (@{$parsed}) {
+	my $types;
+	foreach my $t (@{$r->{reset}->{type}}) {
+		if (!defined($types)) {
+			$types = $t;
+			next;
+		}
+		$types .= ",".$t;
+	}
+	printf "%7d %16s %s\n",
+		$r->{reset}->{server_number},
+		$r->{reset}->{server_ip},
+		$types;
 }
 #print recurse_dump($parsed);
 
@@ -220,13 +262,13 @@ foreach my $server ( @{$parsed} ) {
 }
 
 sub recurse_dump {
-        my ($item) = @_;
-        my $d = Data::Dumper->new([$item]);
-        $d->Purity(1);
-        $d->Terse(0);
-        $d->Deepcopy(1);
-        $d->Indent(2);
-        $d->Sortkeys(1);
-        #$d->Deparse(1);
+	my ($item) = @_;
+	my $d = Data::Dumper->new([$item]);
+	$d->Purity(1);
+	$d->Terse(0);
+	$d->Deepcopy(1);
+	$d->Indent(2);
+	$d->Sortkeys(1);
+	#$d->Deparse(1);
 	return $d->Dump();
 }

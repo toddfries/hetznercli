@@ -14,16 +14,13 @@
 
 package WWW::Hetzner::rdns;
 
-use strict;
-use warnings;
+use Moose;
 
-use parent 'WWW::Hetzner::API';
-
-use WWW::Hetzner;
+extends 'WWW::Hetzner::API';
 
 sub init {
-	my ($me, $ip) = @_;
-	$me->set('ip', $ip);
+	my ($me) = @_;
+	my $ip = $me->ip;
 	$me->{call} = "rdns/${ip}";
 	$me->{dname} = "rdns";
 	$me->refresh;

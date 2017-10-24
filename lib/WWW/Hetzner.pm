@@ -22,44 +22,15 @@ use LWP::UserAgent;
 use MooseX::Params::Validate;
 
 our $VERSION = '0.00000001';
+our $URLBASE = 'https://robot-ws.your-server.de/';
 
-has 'cfile' => (is => 'rw', isa => 'Str', required => 1);
-
-around 'new' => sub {
-	my $orig = shift;
-	my $me = shift;
-
-	my $nme = $me->$orig(@_);
-	if (!defined($nme)) {
-		return $nme;
-	}
-	$me = $nme;
-
-	$me->{ua} = LWP::UserAgent->new();
-	$me->{ua}->env_proxy(1);
-	$me->{ua}->timeout(60);
-
-	$me->loadconf;
-
-	my $huser = $me->{config}->{huser};
-	my $hpass = $me->{config}->{hpass};
-
-	if (!defined($huser) || !defined($hpass)) {
-		die("need huser and hpass defined in config file: ".$me->cfile);
-	}
-
-	$nme->{ua}->credentials( "robot-ws.your-server.de:443", "robot-ws", $huser, $hpass);
-
-	$me->{json} = JSON->new->allow_nonref;
-	$me->{URLBASE} = "https://robot-ws.your-server.de/";
-
-	return $me;
-};
+has 'huser' => (is => 'rw', isa => 'Str', required => 1);
+has 'hpass' => (is => 'rw', isa => 'Str', required => 1);
 
 sub req {
 	my ($me, $call) = @_;
 
-	my $url = $me->{URLBASE}.$call;
+	my $url = $URLBASE.$call;
 	
 	my $req = HTTP::Request->new(GET => $url);
 
@@ -67,15 +38,23 @@ sub req {
 		return "EINVAL URL: $url";
 	}
 
+	if (!defined($me->{ua})) {
+		$me->{ua} = LWP::UserAgent->new();
+		$me->{ua}->env_proxy(1);
+		$me->{ua}->timeout(60);
+		$me->{ua}->credentials( "robot-ws.your-server.de:443",
+			"robot-ws",
+			$me->huser,
+			$me->hpass,
+		);
+	}
+
+
 	my $res = $me->{ua}->request( $req );
 
 	if (!defined($res)) {
 		return "EBADF result URL='$url'";
 	}
-	#if (! $res->is_success) {
-	#	return $res->status_line;
-	#}
-
 	return $me->parse_json( $res, "robot-ws");
 }
 
@@ -94,6 +73,9 @@ sub parse_json {
 		printf "%s has empty str\n", $name;
 		return undef;
 	}
+	if (!defined($me->{json})) {
+		$me->{json} = JSON->new->allow_nonref;
+	}
 
 	my $parsed;
 	#printf "%s: json->decode( '%s' ) .. pre\n", $name, $str;
@@ -107,34 +89,6 @@ sub parse_json {
 ));
 	}
 	return $parsed;
-}
-
-sub loadconf {
-	my ($me) = @_;
-	my $conf = $me->cfile;
-
-	if (! -f $conf) {
-		die("config file '$conf' does not exist");
-	}
-	if (!open(C,$conf)) {
-		die("could not open $conf");
-	}
-	my $line;
-	while(<C>) {
-		if (/^\s*$/ || /^\s*#/) {
-			next;
-		}
-		chomp($line=$_);
-		if ($line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/) {
-			my ($var,$val) = ($1, $2);
-			#printf "loadconf found '%s' = '%s'\n", $var, $val;
-
-			$me->{config}->{$var}=$val;
-			next;
-		}
-		printf "Unhandled config line: %s\n", $line;
-	}
-	close(C);
 }
 
 1;

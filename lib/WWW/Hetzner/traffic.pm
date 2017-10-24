@@ -14,16 +14,12 @@
 
 package WWW::Hetzner::traffic;
 
-use strict;
-use warnings;
-
-use parent 'WWW::Hetzner::API';
-
-use WWW::Hetzner;
+use Moose;
+extends 'WWW::Hetzner::API';
 
 sub init {
-	my ($me, $ip) = @_;
-	$me->set('ip', $ip);
+	my ($me) = @_;
+	my $ip = $me->ip;
 	$me->{call} = "traffic?type=month&from=2017-10-01&to=2017-10-31&ip=${ip}";
 	$me->{dname} = "traffic";
 	$me->refresh;
@@ -31,7 +27,7 @@ sub init {
 
 sub ios {
 	my ($me) = @_;
-	my $ip = $me->{ip};
+	my $ip = $me->ip;
 
 	if (!defined($me->{data}->{$ip}->{in})) {
 		return (undef,undef,undef);
