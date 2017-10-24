@@ -31,7 +31,12 @@ our $opt_v = 0;
 our $opt_c = $ENV{'HOME'}."/.hcli.conf";
 our $opt_p;
 
-getopts('c:p:v');
+our $opt_C; # market_search
+our $opt_D; # market_search
+our $opt_M; # market_search
+
+
+getopts('c:p:vC:D:M:');
 
 my $conf = $opt_c;
 my $config = { };
@@ -66,200 +71,229 @@ my $hetzner = WWW::Hetzner->new(
 
 if ($opt_p eq "ip") {
 
-my $call = "ip";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "servers") {
-my $call = "server";
-my $parsed = $hetzner->req($call);
-foreach my $s (@{$parsed}) {
-	my $ip = $s->{server}->{server_ip};
-	#printf "server ip: %s\n", $ip;
-	my $srvr = WWW::Hetzner::Server->new(hetzner => $hetzner, ip => $ip);
-	my @sub = @{$srvr->get('subnet')};
-	printf "%d %12s: %s\n",
-		$srvr->get('server_number'),
-		$srvr->get('server_name'),
-		$srvr->get('paid_until'),
-	;
-	my $server_ip = $srvr->get('server_ip');
-	my $server_gw = $srvr->get('ip')->get('gateway');
-	if (!defined($server_gw)) {
-		$server_gw = "<undef>";
-	}
-	printf "\t%15s gw %15s\n",
-		$server_ip,
-		$server_gw,
-	;
-	printf "\t%s/%s\n",
-		$sub[0]->{ip},
-		$sub[0]->{mask},
-	;
-	my ($i,$o,$s) = $srvr->traffic;
-	if (defined($i) && defined($o) && defined($s)) {
-		printf "\ttraffic in/out/sum = %f/%f/%f\n", $i, $o, $s;
-	}
-	my $ptr = $srvr->rdns;
-	if (defined($ptr)) {
-		printf "\trdns %s ptr %s\n", $server_ip, $ptr;
-	}
-	my $cancel = $srvr->cancel;
-	if (defined($cancel)) {
-		printf "\tcancel earliest %s, status %s, ",
-			$cancel->get('earliest_cancellation_date'),
-			$cancel->get('cancelled'),
-		;
-		my $cdate = $cancel->get('cancellation_date');
-		if ($cdate ne "<undef>") {
-			printf "date %s, ", $cdate;
-		}
-		my $reason = $cancel->get('cancellation_reason');
-		if (ref($reason) eq "ARRAY") {
-			print "reasons [";
-			foreach my $r (@{$reason}) {
-				printf "'%s',", $r;
-			}
-			print "]\n";
-		}
-	}
-	#my $fire = $srvr->firewall;
-	#print recurse_dump($fire);
+	my $call = "ip";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
 }
-#print recurse_dump($parsed);
 
-} elsif($opt_p eq "reset") {
-my $call = "reset";
-my $parsed = $hetzner->req($call);
-foreach my $r (@{$parsed}) {
-	my $types;
-	foreach my $t (@{$r->{reset}->{type}}) {
-		if (!defined($types)) {
-			$types = $t;
+if($opt_p eq "servers") {
+	my $call = "server";
+	my $parsed = $hetzner->req($call);
+	foreach my $s (@{$parsed}) {
+		my $ip = $s->{server}->{server_ip};
+		my $srvr = WWW::Hetzner::Server->new(
+			hetzner => $hetzner,
+			ip => $ip,
+		);
+		my @sub = @{$srvr->get('subnet')};
+		printf "%d %12s: %s\n",
+			$srvr->get('server_number'),
+			$srvr->get('server_name'),
+			$srvr->get('paid_until'),
+		;
+		my $server_ip = $srvr->get('server_ip');
+		my $server_gw = $srvr->get('ip')->get('gateway');
+		if (!defined($server_gw)) {
+			$server_gw = "<undef>";
+		}
+		printf "\t%15s gw %15s\n",
+			$server_ip,
+			$server_gw,
+		;
+		printf "\t%s/%s\n",
+			$sub[0]->{ip},
+			$sub[0]->{mask},
+		;
+		my ($i,$o,$s) = $srvr->traffic;
+		if (defined($i) && defined($o) && defined($s)) {
+			printf "\ttraffic in/out/sum = %f/%f/%f\n", $i, $o, $s;
+		}
+		my $ptr = $srvr->rdns;
+		if (defined($ptr)) {
+			printf "\trdns %s ptr %s\n", $server_ip, $ptr;
+		}
+		my $cancel = $srvr->cancel;
+		if (defined($cancel)) {
+			printf "\tcancel earliest %s, status %s, ",
+				$cancel->get('earliest_cancellation_date'),
+				$cancel->get('cancelled'),
+			;
+			my $cdate = $cancel->get('cancellation_date');
+			if ($cdate ne "<undef>") {
+				printf "date %s, ", $cdate;
+			}
+			my $reason = $cancel->get('cancellation_reason');
+			if (ref($reason) eq "ARRAY") {
+				print "reasons [";
+				foreach my $r (@{$reason}) {
+					printf "'%s',", $r;
+				}
+				print "]\n";
+			}
+		}
+		#my $fire = $srvr->firewall;
+		#print recurse_dump($fire);
+	}
+	#print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "reset") {
+	my $call = "reset";
+	my $parsed = $hetzner->req($call);
+	foreach my $r (@{$parsed}) {
+		my $types;
+		foreach my $t (@{$r->{reset}->{type}}) {
+			if (!defined($types)) {
+				$types = $t;
+				next;
+			}
+			$types .= ",".$t;
+		}
+		printf "%7d %16s %s\n",
+			$r->{reset}->{server_number},
+			$r->{reset}->{server_ip},
+			$types;
+	}
+	#print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "subnet") {
+	my $call = "subnet";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "rdns") {
+	my $call = "rdns";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "sshkey") {
+	my $call = "key";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "products") {
+	my $call = "order/server/product";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "storagebox") {
+	my $call = "storagebox";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "server_transactions") {
+	my $call = "order/server/transaction";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "market_transactions") {
+	my $call = "order/server_market/transaction";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "traffic") {
+	my $call = "traffic";
+	my $type="month";
+	my $from=uri_escape_utf8("2017-01-01");
+	my $to=uri_escape_utf8("2017-12-31");
+	$call .= "?type=$type";
+	$call .= "&from=$from";
+	$call .= "&to=$to";
+	my $parsed = $hetzner->req($call);
+	print recurse_dump($parsed);
+	exit(0);
+}
+
+if($opt_p eq "market_search") {
+
+	# move defaults to WWW::Hetzner::MarketSearch once created
+	if (!defined($opt_C)) {
+		$opt_C = 5682;
+	}
+	if (!defined($opt_D)) {
+		$opt_D = 4096;
+	}
+	if (!defined($opt_M)) {
+		$opt_M = 48;
+	}
+
+	my $call = "order/server_market/product?search=Ent";
+
+	if (defined($opt_C)) {
+		$call .= "&min_cpu_benchmark=${opt_C}"
+	}
+	if (defined($opt_M)) {
+		$call .= "&min_memory_size=${opt_M}"
+	}
+
+	print "OUTPUT:\n";
+
+
+	my $parsed = $hetzner->req($call);
+	#print recurse_dump($parsed);
+	#print "\n\n";
+
+	printf "%8s %7s %5s %5s %5s %3s %6s %6s %3s %6s\n",
+		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
+	foreach my $server ( @{$parsed} ) {
+
+		my $dc   = $server->{product}->{datacenter};
+		my $mem  = $server->{product}->{memory_size};
+		my $cpub = $server->{product}->{cpu_benchmark};
+		my $disk = $server->{product}->{hdd_count} * $server->{product}->{hdd_size};
+
+		if ($cpub < $opt_C) {
 			next;
 		}
-		$types .= ",".$t;
+		if ($mem < $opt_M) {
+			next;
+		}
+		if ($disk < $opt_D) {
+			next;
+		}
+		my $traffic = $server->{product}->{traffic};
+		$traffic =~ s/ TB$//;
+		$dc =~ s/-DC/-/;
+	
+		printf "%8s %7d %5s %5d %5d %3d %6.2f %6d %3s %s\n",
+			$dc,
+			$server->{product}->{id},
+			$server->{product}->{name},
+			$cpub,
+			$disk,
+			$server->{product}->{memory_size},
+			$server->{product}->{price},
+			$server->{product}->{next_reduce},
+			$traffic,
+			$server->{product}->{cpu},
 	}
-	printf "%7d %16s %s\n",
-		$r->{reset}->{server_number},
-		$r->{reset}->{server_ip},
-		$types;
-}
-#print recurse_dump($parsed);
-
-} elsif($opt_p eq "subnet") {
-my $call = "subnet";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "rdns") {
-my $call = "rdns";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "sshkey") {
-my $call = "key";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "products") {
-my $call = "order/server/product";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "storagebox") {
-my $call = "storagebox";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "server_transactions") {
-my $call = "order/server/transaction";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "market_transactions") {
-my $call = "order/server_market/transaction";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "traffic") {
-my $call = "traffic";
-my $type="month";
-my $from=uri_escape_utf8("2017-01-01");
-my $to=uri_escape_utf8("2017-12-31");
-$call .= "?type=$type";
-$call .= "&from=$from";
-$call .= "&to=$to";
-my $parsed = $hetzner->req($call);
-print recurse_dump($parsed);
-
-} elsif($opt_p eq "market_search") {
-
-# filter options
-our $opt_C = 5682;
-our $opt_D = 4096;
-our $opt_M = 48;
-
-getopts('C:D:M:');
-
-my $call = "order/server_market/product?search=Ent";
-
-if (defined($opt_C)) {
-	$call .= "&min_cpu_benchmark=${opt_C}"
-}
-if (defined($opt_M)) {
-	$call .= "&min_memory_size=${opt_M}"
+	exit(0);
 }
 
-print "OUTPUT:\n";
-
-
-my $parsed = $hetzner->req($call);
-#print recurse_dump($parsed);
-#print "\n\n";
-
-printf "%8s %7s %5s %5s %5s %3s %6s %6s %3s %6s\n",
-	"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
-foreach my $server ( @{$parsed} ) {
-
-	my $dc   = $server->{product}->{datacenter};
-	my $mem  = $server->{product}->{memory_size};
-	my $cpub = $server->{product}->{cpu_benchmark};
-	my $disk = $server->{product}->{hdd_count} * $server->{product}->{hdd_size};
-
-	if ($cpub < $opt_C) {
-		next;
-	}
-	if ($mem < $opt_M) {
-		next;
-	}
-	if ($disk < $opt_D) {
-		next;
-	}
-	my $traffic = $server->{product}->{traffic};
-	$traffic =~ s/ TB$//;
-	$dc =~ s/-DC/-/;
-
-	printf "%8s %7d %5s %5d %5d %3d %6.2f %6d %3s %s\n",
-		$dc,
-		$server->{product}->{id},
-		$server->{product}->{name},
-		$cpub,
-		$disk,
-		$server->{product}->{memory_size},
-		$server->{product}->{price},
-		$server->{product}->{next_reduce},
-		$traffic,
-		$server->{product}->{cpu},
+my $p = $opt_p;
+if (!defined($p)) {
+	$p = "<undef>";
 }
-} else {
-	my $p = $opt_p;
-	if (!defined($p)) {
-		$p = "<undef>";
-	}
-	printf "personality '%s' not found\n", $p;
-	exit(1);
-}
+printf "personality '%s' not found\n", $p;
+exit(1);
 
 sub recurse_dump {
 	my ($item) = @_;
