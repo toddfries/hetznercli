@@ -16,46 +16,30 @@ package WWW::Hetzner;
 
 use Moose; # turns on strict/warnings
 
-use HTTP::Request;
-use JSON;
-use LWP::UserAgent;
 use MooseX::Params::Validate;
 
+use WWW::Hetzner::Server;
+
+extends 'WWW::req';
+
 our $VERSION = '0.00000001';
-our $URLBASE = 'https://robot-ws.your-server.de/';
+
 
 has 'huser' => (is => 'rw', isa => 'Str', required => 1);
 has 'hpass' => (is => 'rw', isa => 'Str', required => 1);
 
-sub req {
-	my ($me, $call) = @_;
+sub setup_ua_creds {
+	my ($me) = @_;
 
-	my $url = $URLBASE.$call;
-	
-	my $req = HTTP::Request->new(GET => $url);
+	$me->urlbase('https://robot-ws.your-server.de/');
+	$me->json_name('robot-ws');
 
-	if (!defined($req)) {
-		return "EINVAL URL: $url";
-	}
-
-	if (!defined($me->{ua})) {
-		$me->{ua} = LWP::UserAgent->new();
-		$me->{ua}->env_proxy(1);
-		$me->{ua}->timeout(60);
-		$me->{ua}->credentials( "robot-ws.your-server.de:443",
-			"robot-ws",
-			$me->huser,
-			$me->hpass,
-		);
-	}
-
-
-	my $res = $me->{ua}->request( $req );
-
-	if (!defined($res)) {
-		return "EBADF result URL='$url'";
-	}
-	return $me->parse_json( $res, "robot-ws");
+	$me->{ua}->credentials(
+		"robot-ws.your-server.de:443",
+		$me->json_name,
+		$me->huser,
+		$me->hpass,
+	);
 }
 
 sub parse_json {
@@ -89,6 +73,20 @@ sub parse_json {
 ));
 	}
 	return $parsed;
+}
+
+sub servers {
+	my ($me) = @_;
+
+	my $parsed = $me->get("server");
+	my @servers;
+	foreach my $s (@{$parsed}) {
+		push @servers, WWW::Hetzner::Server->new(
+			hetzner => $me,
+			ip => $s->{server}->{server_ip},
+		);
+	}
+	return @servers;
 }
 
 1;

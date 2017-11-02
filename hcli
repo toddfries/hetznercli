@@ -78,14 +78,9 @@ if ($opt_p eq "ip") {
 }
 
 if($opt_p eq "servers") {
-	my $call = "server";
-	my $parsed = $hetzner->req($call);
-	foreach my $s (@{$parsed}) {
-		my $ip = $s->{server}->{server_ip};
-		my $srvr = WWW::Hetzner::Server->new(
-			hetzner => $hetzner,
-			ip => $ip,
-		);
+	my @servers = $hetzner->servers;
+	foreach my $srvr (@servers) {
+		my $ip = $srvr->ip;
 		my @sub = @{$srvr->get('subnet')};
 		printf "%d %12s: %s\n",
 			$srvr->get('server_number'),

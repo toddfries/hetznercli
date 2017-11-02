@@ -132,4 +132,5 @@ sub firewall {
 	my $parsed = $me->{hetzner}->req("firewall/$ip");
 	return $parsed;
 }
+
 1;

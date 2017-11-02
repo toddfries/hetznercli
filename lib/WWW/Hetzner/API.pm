@@ -68,7 +68,7 @@ sub refresh {
 	if (!defined($me->{call})) {
 		return;
 	}
-	my $parsed = $me->hetzner->req($me->{call});
+	my $parsed = $me->hetzner->get($me->{call});
 	if (!defined($parsed)) {
 		printf "api %s refresh %s call returned <undef>\n",
 			ref($me),
