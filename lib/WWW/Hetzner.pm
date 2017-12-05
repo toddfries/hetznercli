@@ -89,4 +89,12 @@ sub servers {
 	return @servers;
 }
 
+sub ips {
+	my ($me) = @_;
+
+	my $parsed = $me->get("ip");
+
+	return $parsed;
+}
+
 1;
