@@ -24,6 +24,8 @@ use URI::Escape qw( uri_escape_utf8 );
 use WWW::Hetzner;
 use WWW::Hetzner::Server;
 
+use ReadConf;
+
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
 
@@ -39,30 +41,9 @@ our $opt_M; # market_search
 getopts('c:p:vC:D:M:');
 
 my $conf = $opt_c;
-my $config = { };
 
-if (! -f $conf) {
-	die("config file '$conf' does not exist");
-}
-if (!open(C,$conf)) {
-	die("could not open $conf");
-}
-my $line;
-while(<C>) {
-	if (/^\s*$/ || /^\s*#/) {
-		next;
-	}
-	chomp($line=$_);
-	if ($line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/) {
-		my ($var,$val) = ($1, $2);
-		#printf "loadconf found '%s' = '%s'\n", $var, $val;
-
-		$config->{$var}=$val;
-		next;
-	}
-	printf "Unhandled config line: %s\n", $line;
-}
-close(C);
+my $r = ReadConf->new(conf => $opt_c);
+my $config = $r->readconf()->{_};
 
 my $hetzner = WWW::Hetzner->new(
 	huser => $config->{huser},
@@ -71,8 +52,7 @@ my $hetzner = WWW::Hetzner->new(
 
 if ($opt_p eq "ip") {
 
-	my $call = "ip";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->ips();
 	print recurse_dump($parsed);
 	exit(0);
 }
@@ -136,7 +116,7 @@ if($opt_p eq "servers") {
 
 if($opt_p eq "reset") {
 	my $call = "reset";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	foreach my $r (@{$parsed}) {
 		my $types;
 		foreach my $t (@{$r->{reset}->{type}}) {
@@ -157,49 +137,49 @@ if($opt_p eq "reset") {
 
 if($opt_p eq "subnet") {
 	my $call = "subnet";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "rdns") {
 	my $call = "rdns";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "sshkey") {
 	my $call = "key";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "products") {
 	my $call = "order/server/product";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "storagebox") {
 	my $call = "storagebox";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "server_transactions") {
 	my $call = "order/server/transaction";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "market_transactions") {
 	my $call = "order/server_market/transaction";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
@@ -212,7 +192,7 @@ if($opt_p eq "traffic") {
 	$call .= "?type=$type";
 	$call .= "&from=$from";
 	$call .= "&to=$to";
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	print recurse_dump($parsed);
 	exit(0);
 }
@@ -242,7 +222,7 @@ if($opt_p eq "market_search") {
 	print "OUTPUT:\n";
 
 
-	my $parsed = $hetzner->req($call);
+	my $parsed = $hetzner->get($call);
 	#print recurse_dump($parsed);
 	#print "\n\n";
 
