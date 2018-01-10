@@ -19,6 +19,7 @@ use warnings;
 
 use Data::Dumper;
 use Getopt::Std;
+use POSIX qw(strftime);
 use URI::Escape qw( uri_escape_utf8 );
 
 use WWW::Hetzner;
@@ -219,15 +220,13 @@ if($opt_p eq "market_search") {
 		$call .= "&min_memory_size=${opt_M}"
 	}
 
-	print "OUTPUT:\n";
-
-
 	my $parsed = $hetzner->get($call);
 	#print recurse_dump($parsed);
 	#print "\n\n";
 
-	printf "%8s %7s %5s %5s %5s %3s %6s %6s %3s %6s\n",
+	printf "%8s %7s %5s %5s %5s %3s %6s %10s %3s %6s\n",
 		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
+	my $now = time();
 	foreach my $server ( @{$parsed} ) {
 
 		my $dc   = $server->{product}->{datacenter};
@@ -247,8 +246,12 @@ if($opt_p eq "market_search") {
 		my $traffic = $server->{product}->{traffic};
 		$traffic =~ s/ TB$//;
 		$dc =~ s/-DC/-/;
+
+		my $nextreduce = $server->{product}->{next_reduce};
+		my $nextr = strftime("%m%d %H:%M",localtime($now+$nextreduce));
+		
 	
-		printf "%8s %7d %5s %5d %5d %3d %6.2f %6d %3s %s\n",
+		printf "%8s %7d %5s %5d %5d %3d %6.2f %10s %3s %s\n",
 			$dc,
 			$server->{product}->{id},
 			$server->{product}->{name},
@@ -256,7 +259,7 @@ if($opt_p eq "market_search") {
 			$disk,
 			$server->{product}->{memory_size},
 			$server->{product}->{price},
-			$server->{product}->{next_reduce},
+			$nextr,
 			$traffic,
 			$server->{product}->{cpu},
 	}
