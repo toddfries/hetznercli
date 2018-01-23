@@ -37,9 +37,10 @@ our $opt_p;
 our $opt_C; # market_search
 our $opt_D; # market_search
 our $opt_M; # market_search
+our $opt_X = "Ent"; # market_search
 
 
-getopts('c:p:vC:D:M:');
+getopts('c:p:vC:D:M:X:');
 
 my $conf = $opt_c;
 
@@ -211,13 +212,27 @@ if($opt_p eq "market_search") {
 		$opt_M = 48;
 	}
 
-	my $call = "order/server_market/product?search=Ent";
-
+	my $call = "order/server_market/product";
+	our $argc = 0;
+	sub addvar {
+		my ($var,$val) = @_;
+		my $str = "";
+		if ($argc++ > 0) {
+			$str .= "&";
+		} else {
+			$str .= "?";
+		}
+		$str .= $var."=".$val;
+	}
+		
+	if (length($opt_X) > 0) {
+		$call .= addvar('search',$opt_X);
+	}
 	if (defined($opt_C)) {
-		$call .= "&min_cpu_benchmark=${opt_C}"
+		$call .= addvar('min_cpu_benchmark',$opt_C);
 	}
 	if (defined($opt_M)) {
-		$call .= "&min_memory_size=${opt_M}"
+		$call .= addvar('min_memory_size',$opt_M);
 	}
 
 	my $parsed = $hetzner->get($call);
