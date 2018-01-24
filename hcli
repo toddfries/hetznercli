@@ -34,13 +34,14 @@ our $opt_v = 0;
 our $opt_c = $ENV{'HOME'}."/.hcli.conf";
 our $opt_p;
 
-our $opt_C; # market_search
-our $opt_D; # market_search
-our $opt_M; # market_search
-our $opt_X = "Ent"; # market_search
+our $opt_C; # market_search, cpu bench min
+our $opt_D; # market_search, disk size min
+our $opt_M; # market_search, mem size min
+our $opt_X = "Ent"; # market_search, text search string
+our $opt_O; # market_search, sort order
 
 
-getopts('c:p:vC:D:M:X:');
+getopts('c:p:vC:D:M:O:X:');
 
 my $conf = $opt_c;
 
@@ -61,6 +62,7 @@ if ($opt_p eq "ip") {
 
 if($opt_p eq "servers") {
 	my @servers = $hetzner->servers;
+
 	foreach my $srvr (@servers) {
 		my $ip = $srvr->ip;
 		my @sub = @{$srvr->get('subnet')};
@@ -242,7 +244,24 @@ if($opt_p eq "market_search") {
 	printf "%8s %7s %5s %5s %5s %3s %6s %10s %3s %6s\n",
 		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
 	my $now = time();
-	foreach my $server ( @{$parsed} ) {
+	my @res;
+	if (defined($opt_O)) {
+		if ($opt_O eq "mem") {
+			@res = sort {
+			    $a->{product}->{memory_size} <=>
+			    $b->{product}->{memory_size} } @{$parsed};
+		} elsif ($opt_O eq "price") {
+			@res = sort {
+			    $a->{product}->{price} <=>
+			    $b->{product}->{price} } @{$parsed};
+		} else {
+			print "market_search: unhandled sort type ${opt_O}\n";
+		}
+	} else {
+		@res = @{$parsed};
+	}
+	
+	foreach my $server ( @res ) {
 
 		my $dc   = $server->{product}->{datacenter};
 		my $mem  = $server->{product}->{memory_size};
