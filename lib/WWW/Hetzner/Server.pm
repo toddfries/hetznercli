@@ -23,6 +23,8 @@ use WWW::Hetzner::traffic;
 use WWW::Hetzner::rdns;
 use WWW::Hetzner::cancellation;
 
+use POSIX qw(strftime);
+
 sub init {
 	my ($me) = @_;
 	my $ip = $me->ip;
@@ -103,7 +105,24 @@ sub traffic {
 		#printf "%s->traffic: set('traffic',%s)\n", ref($me), $ip;
 		$me->set('_trafficbw',$ip);
 	}
-	return $me->{_trafficbw}->ios;
+	my $start = strftime("%Y-%m-01", localtime(time()));
+	my $mno = strftime("%m", localtime(time()));
+	my %mdays;
+	$mdays{'01'}=31;
+	$mdays{'02'}=29;
+	$mdays{'03'}=31;
+	$mdays{'04'}=30;
+	$mdays{'05'}=31;
+	$mdays{'06'}=30;
+	$mdays{'07'}=31;
+	$mdays{'08'}=31;
+	$mdays{'09'}=30;
+	$mdays{'10'}=30;
+	$mdays{'11'}=31;
+	$mdays{'12'}=31;
+	my $stop = strftime("%Y-%m-".$mdays{$mno}, localtime(time()));
+	print "traffic passing start=$start stop=$stop\n";
+	return $me->{_trafficbw}->ios($start, $stop);
 }
 
 sub rdns {

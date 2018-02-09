@@ -20,14 +20,32 @@ extends 'WWW::Hetzner::API';
 sub init {
 	my ($me) = @_;
 	my $ip = $me->ip;
-	$me->{call} = "traffic?type=month&from=2017-10-01&to=2017-10-31&ip=${ip}";
 	$me->{dname} = "traffic";
+	$me->{start} = "2017-10-01";
+	$me->{stop}  = "2017-10-31";
+	$me->refreshcall;
 	$me->refresh;
 }
 
-sub ios {
+sub refreshcall {
 	my ($me) = @_;
+
+	$me->{call} = "traffic?ip=".$me->{ip}."&type=month&from=".$me->{start}."&to=".$me->{stop};
+}
+
+sub ios {
+	my ($me, $start, $stop) = @_;
 	my $ip = $me->ip;
+	if (defined($start)) {
+		$me->{start}=$start;
+	}
+	if (defined($stop)) {
+		$me->{stop}=$stop;
+	}
+	if (defined($start) || defined($stop)) {
+		$me->refreshcall;
+		$me->refresh;
+	}
 
 	if (!defined($me->{data}->{$ip}->{in})) {
 		return (undef,undef,undef);
