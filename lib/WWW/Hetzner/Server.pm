@@ -121,7 +121,7 @@ sub traffic {
 	$mdays{'11'}=31;
 	$mdays{'12'}=31;
 	my $stop = strftime("%Y-%m-".$mdays{$mno}, localtime(time()));
-	print "traffic passing start=$start stop=$stop\n";
+	#print "traffic passing start=$start stop=$stop\n";
 	return $me->{_trafficbw}->ios($start, $stop);
 }
 
