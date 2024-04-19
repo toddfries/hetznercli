@@ -1,0 +1,139 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2024 Todd T. Fries <todd@fries.net>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use strict;
+use warnings;
+use LWP::Simple;  # For fetching the JSON data
+use JSON;         # For parsing the JSON
+use Date::Manip;
+use Getopt::Std;
+
+our $opt_e; # ecc 0 or 1
+our $opt_p; # max price
+our $opt_s; # min storage
+our $opt_m; # min ram
+
+$opt_e = 1;
+
+getopts('e:m:p:s:');
+
+my $d = Date::Manip::Date->new();
+my $delta;
+my $now = Date::Manip::Date->new();
+
+$now->parse("now");
+
+# Fetch the JSON data from the URL
+my $url = 'https://www.hetzner.com/_resources/app/jsondata/live_data_sb.json';
+$url = 'file:./live_data_sb.json';
+my $json_content = get($url);
+
+# Parse the JSON data
+my $decoded_json = decode_json($json_content);
+
+# Sid ram (GB) Storage (GB) Disk Count Price Redux time
+
+my $fmt = "%9d %3d %6d %2d %6s %6.3f %s\n";
+
+# example:
+# 2363769  32  40000  4     66  1.650  0d  0:48:45 aka 20240418 20:28:52
+my $hdr = "
+                 HDD HDD        Price
+          Ram   Size  Ct          Per  ,--Next Adjust-------------------.
+ ServerID  GB     GB     Price     TB Day HH:MM:SS     Date     Time\n";
+
+print $hdr;
+
+# Display relevant information for each filtered entry
+foreach my $entry ( @{ $decoded_json->{server} } ) {
+	my $id = $entry->{id};
+	my $ram = $entry->{ram_size};
+	my $disk_storage_total = $entry->{hdd_size} * $entry->{hdd_count};
+	my $disk_count = scalar @{ $entry->{hdd_arr} };
+	my $price = $entry->{price};
+	my $ts_redux = $entry->{next_reduce_timestamp};
+	my $dc = $entry->{datacenter};
+	my $ecc = $entry->{is_ecc};
+	my @hddhr = @{ $entry->{hdd_hr} };
+
+	my $dcount = 0;
+	my $dsize = 0;
+	foreach my $disk (@hddhr) {
+		if ($disk =~ /^([0-9\.]+)\s([TG]B)\s(.*)$/) {
+			my $size = $1;
+			my $unit = $2;
+			my $desc = $3;
+			if ($unit eq "GB") {
+				$dcount++;
+				$dsize += $size;
+				next;
+			}
+			if ($unit eq "TB") {
+				$dcount++;
+				$dsize += $size * 1000;
+				next;
+			}
+			print " size=$size unit=$unit desc=$desc !match\n";
+			next;
+		}
+		print " disk=$disk !match\n";
+	}
+
+	if ($ecc < $opt_e) {
+		next;
+	}
+	if (!grep {/Enterprise HDD/} @{ $entry->{hdd_hr} }) {
+		next;
+	}
+	if (defined($opt_s)) {
+		if ($dsize < $opt_s) {
+			next;
+		}
+	}
+	if (defined($opt_p)) {
+		if ($price > $opt_p) {
+			next;
+		}
+	}
+	if (defined($opt_m)) {
+		if ($ram < $opt_m) {
+			next;
+		}
+	}
+
+	$d->parse_format('%s', $ts_redux);
+	my $diff;
+
+	if ($d->printf("%s") > $now->printf("%s"))  {
+		$delta = $now->calc($d);
+		#$diff = $delta->printf("%d %H:%M:%S");
+		#$diff = $delta->printf("%.1dhm");
+		$diff = $delta->printf("%2dvd %2hv:%02mv:%02sv");
+	} else {
+		if ($entry->{fixed_price} < 1) {
+			$diff = "       fixed";
+		} else {
+			$diff = "      reload";
+		}
+	}
+	
+	my $pptb = ( $price * 1.0 ) / ( $dsize / 1000.0 );
+
+	printf $fmt, $id, $ram, $dsize, $dcount, $price, $pptb,
+		$diff . " aka ".$d->printf("%Y%m%d %H:%M:%S");
+
+}
+
