@@ -20,15 +20,19 @@ use LWP::Simple;  # For fetching the JSON data
 use JSON;         # For parsing the JSON
 use Date::Manip;
 use Getopt::Std;
+use Data::Dumper;
 
 our $opt_e; # ecc 0 or 1
 our $opt_p; # max price
 our $opt_s; # min storage
 our $opt_m; # min ram
+our $opt_c; # min hdd count
+
+our $opt_D; # dump serverid(s)
 
 $opt_e = 1;
 
-getopts('e:m:p:s:');
+getopts('c:e:m:p:s:D:');
 
 my $d = Date::Manip::Date->new();
 my $delta;
@@ -60,6 +64,17 @@ print $hdr;
 # Display relevant information for each filtered entry
 foreach my $entry ( @{ $decoded_json->{server} } ) {
 	my $id = $entry->{id};
+	if (defined($opt_D)) {
+		foreach my $did (split(/,/,$opt_D)) {
+			if ($id eq $did) {
+				print "id $id: ".Dumper($entry);
+			} else {
+				#print "id $id != did $did\n";
+			}
+		}
+		next;
+	}
+
 	my $ram = $entry->{ram_size};
 	my $disk_storage_total = $entry->{hdd_size} * $entry->{hdd_count};
 	my $disk_count = scalar @{ $entry->{hdd_arr} };
@@ -110,6 +125,11 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 	}
 	if (defined($opt_m)) {
 		if ($ram < $opt_m) {
+			next;
+		}
+	}
+	if (defined($opt_c)) {
+		if ($dcount < $opt_c) {
 			next;
 		}
 	}
