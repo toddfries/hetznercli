@@ -48,6 +48,14 @@ my $conf = $opt_c;
 my $r = ReadConf->new(conf => $opt_c);
 my $config = $r->readconf()->{_};
 
+if (!defined($config->{huser})) {
+	die "Didn't read huser from $opt_c";
+}
+if (!defined($config->{hpass})) {
+	die "Didn't read hpass from $opt_c";
+}
+
+
 my $hetzner = WWW::Hetzner->new(
 	huser => $config->{huser},
 	hpass => $config->{hpass},
@@ -258,7 +266,13 @@ if($opt_p eq "market_search") {
 			print "market_search: unhandled sort type ${opt_O}\n";
 		}
 	} else {
-		@res = @{$parsed};
+		if (ref($parsed) eq "ARRAY") {
+			@res = @{$parsed};
+		} else {
+			print "parsed is a ".ref($parsed)." and contains: ";
+			print Dumper($parsed);
+			exit(1);
+		}
 	}
 	
 	foreach my $server ( @res ) {
