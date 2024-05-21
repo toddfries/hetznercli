@@ -28,36 +28,45 @@ our $opt_s; # min storage
 our $opt_m; # min ram
 our $opt_c; # min hdd count
 
+our $opt_o; # option1=foo;option2=a,b,c;option3=d
+
 our $opt_D; # dump serverid(s)
 
 $opt_e = 1;
 
-getopts('c:e:m:p:s:D:');
+getopts('c:e:m:o:p:s:D:');
 
 my $d = Date::Manip::Date->new();
 my $delta;
 my $now = Date::Manip::Date->new();
+my $opt = { };
+if (defined($opt_o)) {
+	foreach my $o (split(/;/,$opt_o)) {
+		if ($o =~ /^(.*)=(.*)$/) {
+			$opt->{$1} = $2;
+		}
+	}
+}
 
 $now->parse("now");
 
 # Fetch the JSON data from the URL
-my $url = 'https://www.hetzner.com/_resources/app/jsondata/live_data_sb.json';
-$url = 'file:./live_data_sb.json';
-my $json_content = get($url);
+$opt->{url} = 'https://www.hetzner.com/_resources/app/jsondata/live_data_sb.json';
+#$url = 'file:./live_data_sb.json';
 
 # Parse the JSON data
-my $decoded_json = decode_json($json_content);
+my $decoded_json = decode_json(getjson());
 
 # Sid ram (GB) Storage (GB) Disk Count Price Redux time
 
-my $fmt = "%9d %3d %6d %2d %6s %6.3f %s\n";
+my $fmt = "%9d %4d %6d %2d %6s %6.3f %s\n";
 
 # example:
 # 2363769  32  40000  4     66  1.650  0d  0:48:45 aka 20240418 20:28:52
 my $hdr = "
-                 HDD HDD        Price
-          Ram   Size  Ct          Per  ,--Next Adjust-------------------.
- ServerID  GB     GB     Price     TB Day HH:MM:SS     Date     Time\n";
+                  HDD HDD        Price
+           Ram   Size  Ct          Per  ,--Next Adjust-------------------.
+ ServerID   GB     GB     Price     TB Day HH:MM:SS     Date     Time\n";
 
 print $hdr;
 
@@ -107,6 +116,11 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 		print " disk=$disk !match\n";
 	}
 
+	if (defined($opt->{fixed}) && $opt->{fixed} == 1) {
+		if ($entry->{fixed_price} < 1) {
+			next;
+		}
+	}
 	if ($ecc < $opt_e) {
 		next;
 	}
@@ -157,3 +171,27 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 
 }
 
+1;
+
+sub getjson {
+	my $content = "";
+	# $content = get($$opt->{url});
+	my $i = 0;
+	my $file = ".nonexistent";
+
+	while(1) {
+		if (-f $file) {
+			last;
+		}
+		$file = sprintf("data/%d.json.xz",$i++);
+	}
+	if (! -f $file) {
+		die "Cant open ${file}";
+	}
+	open(XZ,"xzcat $file |");
+	while(<XZ>) {
+		$content .= $_;
+	}
+	close(XZ);
+	return $content;
+}
