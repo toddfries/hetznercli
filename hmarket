@@ -27,6 +27,7 @@ our $opt_p; # max price
 our $opt_s; # min storage
 our $opt_m; # min ram
 our $opt_c; # min hdd count
+our $opt_v; # verbose
 
 our $opt_o; # option1=foo;option2=a,b,c;option3=d
 
@@ -34,7 +35,12 @@ our $opt_D; # dump serverid(s)
 
 $opt_e = 1;
 
-getopts('c:e:m:o:p:s:D:');
+getopts('c:e:m:o:p:s:vD:');
+
+our $v = $opt_v;
+if (!defined($v)) {
+	$v = 0;
+}
 
 my $d = Date::Manip::Date->new();
 my $delta;
@@ -72,6 +78,8 @@ print $hdr;
 
 # Display relevant information for each filtered entry
 foreach my $entry ( @{ $decoded_json->{server} } ) {
+	#print Dumper($entry);
+	#exit(0);
 	my $id = $entry->{id};
 	if (defined($opt_D)) {
 		foreach my $did (split(/,/,$opt_D)) {
@@ -92,6 +100,10 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 	my $dc = $entry->{datacenter};
 	my $ecc = $entry->{is_ecc};
 	my @hddhr = @{ $entry->{hdd_hr} };
+	my $cpuinfo = $entry->{cpu};
+
+	$dc =~ s/^\s+//g;
+	$dc =~ s/\s+$//g;
 
 	my $dcount = 0;
 	my $dsize = 0;
@@ -155,9 +167,19 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 		$delta = $now->calc($d);
 		#$diff = $delta->printf("%d %H:%M:%S");
 		#$diff = $delta->printf("%.1dhm");
-		$diff = $delta->printf("%2dvd %2hv:%02mv:%02sv");
+		#$diff = $delta->printf("%2dvd %2hv:%02mv:%02sv");
+		my $d = $delta->printf("%dv");
+		my $h = $delta->printf("%hv");
+		if ($h > 24) {
+			while ($h > 24) {
+				$d += 1;
+				$h -= 24;
+			}
+		}
+		my $ms = $delta->printf("%02mv:%02sv");
+		$diff = sprintf("%2dd %2d:%s", $d, $h, $ms);
 	} else {
-		if ($entry->{fixed_price} < 1) {
+		if ($entry->{fixed_price} > 0) {
 			$diff = "       fixed";
 		} else {
 			$diff = "      reload";
@@ -168,7 +190,9 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 
 	printf $fmt, $id, $ram, $dsize, $dcount, $price, $pptb,
 		$diff . " aka ".$d->printf("%Y%m%d %H:%M:%S");
-
+	if ($v>0) {
+		printf "%9s dc: '%9s' cpu: %s\n\n", " ", $dc, $cpuinfo;
+	}
 }
 
 1;
@@ -176,19 +200,28 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 sub getjson {
 	my $content = "";
 	# $content = get($$opt->{url});
-	my $i = 0;
 	my $file = ".nonexistent";
 
-	while(1) {
-		if (-f $file) {
-			last;
+	if (defined($opt->{jsonfile})) {
+		$file = $opt->{jsonfile};
+	} else {
+		my $i = 0;
+		while(1) {
+			my $tstfile = sprintf("data/%d.json.xz",$i++);
+			if (-f $tstfile) {
+				$file = $tstfile;
+			} else {
+				last;
+			}
 		}
-		$file = sprintf("data/%d.json.xz",$i++);
 	}
 	if (! -f $file) {
 		die "Cant open ${file}";
 	}
-	open(XZ,"xzcat $file |");
+	if ($v>0) {
+		print "opening $file\n";
+	}
+	open(XZ,"xzcat $file |") || die "xzcat failed on $file";
 	while(<XZ>) {
 		$content .= $_;
 	}
