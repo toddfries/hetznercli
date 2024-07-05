@@ -1,0 +1,8 @@
+echo "2disk 8gb storage <=\$50 >=64G ram"
+./hmarket -c 2 -s  8000 -p 50 -m 64 "$@"
+
+echo "2disk 4gb storage <=\$40 >=64G ram"
+./hmarket -c 2 -s  4000 -p 40 -m 64 "$@"
+
+echo "2disk 8gb storage <=\$72 >=128G ram"
+./hmarket -c 2 -s  8000 -p 72 -m 128 "$@"
