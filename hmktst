@@ -1,0 +1,19 @@
+echo "Storage min 40g price max 100"
+./hmarket -s 40000 -p 100 "$@"
+echo
+
+
+echo "Storage min 27g price max 80"
+./hmarket -s 27000 -p 80  "$@"
+echo
+
+echo "Disk count min 5 price max 80"
+./hmarket -c 5 -p 80  "$@"
+echo
+
+echo "Lotta disk cheap"
+./hmarket -s 80000 "$@"
+echo
+
+echo "Lucky draw: 7 disk min.."
+./hmarket -c 7 "$@"
