@@ -81,6 +81,18 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 	#print Dumper($entry);
 	#exit(0);
 	my $id = $entry->{id};
+	if (defined($opt->{id})) {
+		my $matchid = 0;
+		foreach my $oid (split(/,/,$opt->{id})) {
+			if ($oid eq $id) {
+				$matchid = 1;
+				last;
+			}
+		}
+		if ($matchid < 1) {
+			next;
+		}
+	}
 	if (defined($opt_D)) {
 		foreach my $did (split(/,/,$opt_D)) {
 			if ($id eq $did) {
