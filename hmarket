@@ -92,16 +92,9 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 		if ($matchid < 1) {
 			next;
 		}
-	}
-	if (defined($opt_D)) {
-		foreach my $did (split(/,/,$opt_D)) {
-			if ($id eq $did) {
-				print "id $id: ".Dumper($entry);
-			} else {
-				#print "id $id != did $did\n";
-			}
+		if (!defined($opt_D)) {
+			$opt_D = $id;
 		}
-		next;
 	}
 
 	my $ram = $entry->{ram_size};
@@ -203,7 +196,24 @@ foreach my $entry ( @{ $decoded_json->{server} } ) {
 	printf $fmt, $id, $ram, $dsize, $dcount, $price, $pptb,
 		$diff . " aka ".$d->printf("%Y%m%d %H:%M:%S");
 	if ($v>0) {
-		printf "%9s dc: '%9s' cpu: %s\n\n", " ", $dc, $cpuinfo;
+		printf "%9s dc: '%9s' cpu: %s cid: %d\n",
+			" ", $dc, $cpuinfo, $entry->{cat_id};
+		foreach my $r (@{ $entry->{ram} }) {
+			printf "%9s ram: %s\n", " ", $r;
+		}
+		foreach my $r (grep {/^NIC/} @{ $entry->{information} }) {
+			printf "%9s nic: %s\n", " ", $r;
+		}
+		if (defined($opt_D)) {
+			foreach my $did (split(/,/,$opt_D)) {
+				if ($id eq $did) {
+					print "id $id: ".Dumper($entry);
+				} else {
+					#print "id $id != did $did\n";
+				}
+			}
+		}
+		print "\n";
 	}
 }
 

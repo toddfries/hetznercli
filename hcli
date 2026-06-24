@@ -23,7 +23,7 @@ use POSIX qw(strftime);
 use URI::Escape qw( uri_escape_utf8 );
 
 use WWW::Hetzner;
-use WWW::Hetzner::Server;
+
 
 use ReadConf;
 
