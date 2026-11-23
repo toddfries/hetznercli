@@ -39,3 +39,8 @@ Each answered AA.
     61s, 66s, and 71s after the 20:47:38 set
   pxj.fdh.bz  20:48:54, 20:48:59, 20:49:04 UTC
     71s, 76s, and 81s after the 20:47:43 set
+
+A later pass asked the same three servers again at 20:52:55 through
+20:53:21 UTC and got the same AA answers. That pass measured from the
+API write to its own first query, about 317 to 338 seconds. The
+20:48 queries above are the first time each server was seen answering.
