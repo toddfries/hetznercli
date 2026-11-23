@@ -1,0 +1,292 @@
+#!/usr/bin/perl
+# Copyright (c) 2026 Todd T. Fries <todd@fries.net>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# purpose: print the install plan, and perform a Robot write only after --yes-vswitch
+# usage: hinstall --offline --sums ... --inventory ... --spec ...
+#        hinstall --server N --reference N
+# exit codes: 0 plan printed, non-zero a refused write or a failed read
+
+use strict;
+use warnings;
+
+use FindBin;
+use Getopt::Long qw(GetOptions);
+use JSON::PP ();
+
+use lib "$FindBin::Bin/lib";
+use lib "$ENV{HOME}/git/sw/p5-WWW-req/lib";
+use lib "$ENV{HOME}/git/sw/p5-WWW-Hetzner/lib";
+
+use Hetznercli::Addr;
+use Hetznercli::Iso;
+use Hetznercli::Kvm;
+use Hetznercli::Layout;
+use Hetznercli::Vswitch;
+
+my $offline = 0;
+my $server;
+my $reference;
+my $inventory_file;
+my $spec_file;
+my $interfaces_file;
+my $nic;
+my $public_v6;
+my $lan;
+my $sums_file;
+my $vswitch_file;
+my $hosts_file;
+my $yes_vswitch = 0;
+my $yes_download = 0;
+my $yes_kvm = 0;
+
+GetOptions(
+	'offline' => \$offline,
+	'server=s' => \$server,
+	'reference=s' => \$reference,
+	'inventory=s' => \$inventory_file,
+	'spec=s' => \$spec_file,
+	'interfaces=s' => \$interfaces_file,
+	'nic=s' => \$nic,
+	'public-v6=s' => \$public_v6,
+	'lan=s' => \$lan,
+	'sums=s' => \$sums_file,
+	'vswitch-file=s' => \$vswitch_file,
+	'hosts=s' => \$hosts_file,
+	'yes-vswitch' => \$yes_vswitch,
+	'yes-download' => \$yes_download,
+	'yes-kvm' => \$yes_kvm,
+) or die "bad args\n";
+
+if ($offline && $yes_vswitch) {
+	die "not posting: --offline refuses --yes-vswitch\n";
+}
+
+sub slurp {
+	my ($path) = @_;
+	open my $fh, '<', $path or die "open $path: $!";
+	local $/;
+	return scalar <$fh>;
+}
+
+sub load_json {
+	my ($path) = @_;
+	return JSON::PP->new->utf8->decode(slurp($path));
+}
+
+sub fetch_text {
+	my ($url) = @_;
+	require LWP::UserAgent;
+	my $ua = LWP::UserAgent->new(timeout => 60);
+	my $res = $ua->get($url);
+	die "GET $url failed: " . $res->status_line . "\n" if !$res->is_success;
+	return $res->decoded_content;
+}
+
+sub robot {
+	require ReadConf;
+	require WWW::Hetzner;
+	my $path = $ENV{HOME} . '/.hcli.conf';
+	my $config = ReadConf->new(conf => $path)->readconf()->{_};
+	die "no huser in $path\n" if !defined($config->{huser});
+	die "no hpass in $path\n" if !defined($config->{hpass});
+	return WWW::Hetzner->new(
+		huser => $config->{huser},
+		hpass => $config->{hpass},
+	);
+}
+
+sub attach_one {
+	my ($api, $id, $target) = @_;
+	my $last;
+	foreach my $try (1 .. 3) {
+		$last = $api->vswitch_attach($id, $target);
+		my $code = '';
+		if (ref($last) eq 'HASH' && ref($last->{error}) eq 'HASH') {
+			$code = $last->{error}{code} || '';
+		}
+		return $last if defined($last) && $code eq '';
+		return $last if $code ne 'VSWITCH_IN_PROCESS';
+		sleep 5 if $try < 3;
+	}
+	return $last;
+}
+
+my $api;
+if (!$offline && defined($server)) {
+	$api = robot();
+	my $raw = $api->get("server/$server");
+	if (ref($raw) eq 'HASH' && $raw->{error}) {
+		die "server $server: $raw->{error}{code} $raw->{error}{message}\n";
+	}
+	my $addr = Hetznercli::Addr::host_from_server($raw);
+	die "server $server has no server_ipv6_net\n" if !defined($addr);
+	$public_v6 = $addr if !defined($public_v6);
+	print "public v6: $public_v6\n";
+	if (defined($reference)) {
+		my $ref = $api->get("server/$reference");
+		my $ref_addr = Hetznercli::Addr::host_from_server($ref);
+		if (defined($ref_addr)) {
+			print "reference v6: $ref_addr\n";
+		}
+	}
+}
+
+my $sums;
+if (defined($sums_file)) {
+	$sums = slurp($sums_file);
+} elsif (!$offline) {
+	$sums = fetch_text('https://enterprise.proxmox.com/iso/SHA256SUMS');
+}
+if (defined($sums)) {
+	my $rec = Hetznercli::Iso::recommend($sums);
+	print "ISO choices, newest first:\n";
+	foreach my $row (@{ $rec->{choices} }) {
+		my $mark = ($row->{name} eq $rec->{recommended}{name}) ? ' recommended' : '';
+		my $hash = defined($row->{sha256}) ? $row->{sha256} : 'no-hash';
+		print "  $row->{name} $hash$mark\n";
+	}
+	print "ISO url: $rec->{url}\n" if $rec->{url};
+}
+
+if (!$offline && !defined($sums_file)) {
+	my $aaaa = `host -t AAAA enterprise.proxmox.com 2>&1`;
+	if (my ($addr) = $aaaa =~ /((?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:]*)/) {
+		print "AAAA: $addr\n";
+	} else {
+		print "AAAA: none confirmed, do not download yet\n";
+		print $aaaa;
+	}
+}
+
+my @missing;
+my $rows;
+if (defined($vswitch_file)) {
+	$rows = load_json($vswitch_file);
+} elsif ($api) {
+	my $parsed = $api->get('vswitch');
+	if (ref($parsed) eq 'HASH' && $parsed->{error}) {
+		die "vswitch: $parsed->{error}{code} $parsed->{error}{message}\n";
+	}
+	$rows = [WWW::Hetzner::vswitch_rows($parsed)];
+}
+if ($api && $rows) {
+	my @full;
+	foreach my $row (@{ $rows }) {
+		if (ref($row->{server}) ne 'ARRAY') {
+			my $one = $api->get("vswitch/$row->{id}");
+			if (ref($one) eq 'HASH' && $one->{error}) {
+				die "vswitch $row->{id}: $one->{error}{code} $one->{error}{message}\n";
+			}
+			my @detail = WWW::Hetzner::vswitch_rows($one);
+			die "vswitch $row->{id} detail missing\n" if @detail != 1;
+			$row = $detail[0];
+		}
+		push @full, $row;
+	}
+	$rows = \@full;
+}
+if ($rows && defined($reference) && defined($server)) {
+	my @unknown = Hetznercli::Vswitch::unknown_membership($rows);
+	if (@unknown) {
+		die "vSwitch membership unknown for " . join(' ', @unknown)
+			. "; refusing to treat that as already attached\n";
+	}
+	@missing = Hetznercli::Vswitch::missing($rows, $reference, $server);
+	print "vSwitch delta, reference $reference, target $server:\n";
+	if (!@missing) {
+		print "  none\n";
+	}
+	foreach my $row (@missing) {
+		print "  $row->{id} vlan $row->{vlan} $row->{name}\n";
+	}
+}
+
+if ($yes_vswitch) {
+	die "not posting: no Robot client\n" if !$api;
+	die "not posting: no missing vSwitch\n" if !@missing;
+	foreach my $row (@missing) {
+		my $got = attach_one($api, $row->{id}, $server);
+		if (!defined($got) || (ref($got) eq 'HASH' && $got->{error})) {
+			my $code = ref($got) eq 'HASH' ? ($got->{error}{code} || 'error') : 'undef';
+			die "attach $row->{id} failed: $code\n";
+		}
+		print "posted $row->{id}\n";
+	}
+	my $again = $api->get('vswitch');
+	my @rows = WWW::Hetzner::vswitch_rows($again);
+	my %want = map { $_->{id} => 1 } @missing;
+	my @still = grep { $want{ $_->{id} } }
+		Hetznercli::Vswitch::missing(\@rows, $reference, $server);
+	if (@still) {
+		die "GET after POST still missing "
+			. join(' ', map { $_->{id} } @still) . "\n";
+	}
+	print "GET shows $server on each posted vSwitch\n";
+} else {
+	print "not posting vSwitch membership\n";
+}
+
+if (defined($hosts_file)) {
+	my $candidate = Hetznercli::Vswitch::next_lan(slurp($hosts_file), {});
+	if (defined($candidate)) {
+		print "lan candidate from hosts file: $candidate\n";
+	} else {
+		print "lan candidate from hosts file: none\n";
+	}
+	print "ping not checked\n";
+	$lan = $candidate if !defined($lan) && defined($candidate);
+}
+
+if (defined($interfaces_file) && defined($nic) && defined($public_v6) && defined($lan)) {
+	my $rendered = Hetznercli::Vswitch::render(slurp($interfaces_file), {
+		nic => $nic,
+		public_v6 => $public_v6,
+		lan_addr => $lan,
+	});
+	die "$rendered->{error}\n" if $rendered->{error};
+	print "interfaces draft:\n$rendered->{text}";
+	print "not writing the host interfaces file\n";
+}
+
+if (defined($inventory_file) && defined($spec_file)) {
+	my $planned = Hetznercli::Layout::plan(
+		load_json($inventory_file), load_json($spec_file));
+	die "$planned->{error}\n" if $planned->{error};
+	print Hetznercli::Layout::checklist($planned);
+	my $iso = '/tmp/proxmox-ve-serial.iso';
+	if (defined($sums)) {
+		my $rec = Hetznercli::Iso::recommend($sums);
+		if ($rec->{recommended}) {
+			$iso = '/tmp/' . $rec->{recommended}{name};
+			$iso =~ s/\.iso\z/-serial.iso/;
+		}
+	}
+	my @argv = Hetznercli::Kvm::argv(disks => $planned->{install_disks}, iso => $iso);
+	print "kvm: " . join(' ', @argv) . "\n";
+	if ($planned->{special}) {
+		my @tails = Hetznercli::Layout::tail_placeholders($planned);
+		my $pool = Hetznercli::Layout::zpool_command($planned, \@tails);
+		die "$pool->{error}\n" if $pool->{error};
+		print "zpool after the tails exist: " . join(' ', @{ $pool->{argv} }) . "\n";
+	}
+}
+
+if ($yes_download || $yes_kvm) {
+	die "not downloading and not starting kvm: that runs on the rescue host after a yes on the printed line\n";
+}
+print "not downloading\n";
+print "not starting kvm\n";
+
+exit 0;

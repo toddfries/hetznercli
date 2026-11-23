@@ -1,0 +1,74 @@
+auto lo
+iface lo inet loopback
+
+auto ens18
+allow-hotplug ens18
+
+iface ens18 inet6 auto
+	request_prefix no
+	accept_ra 1
+	autoconf 1
+	privext 0
+
+iface ens18 inet static
+	address 10.0.2.15/24
+	gateway 10.0.2.2
+
+iface enp0s31f6 inet manual
+
+auto vmbr0
+iface vmbr0 inet6 static
+	address fe80::2/32
+	gateway fe80::1
+	bridge-ports enp0s31f6
+	bridge-stp off
+	bridge-fd 0
+	bridge-vlan-aware yes
+	bridge-vids 2-4094
+
+auto vmbr1
+iface vmbr1 inet6 static
+	address 2a01:4f8:13b:1995::2/64
+	bridge-ports none
+	bridge-stp off
+	bridge-fd 0
+	mtu 1500
+
+auto vmbr0.4000
+iface vmbr0.4000 inet manual
+
+auto vmbr0.4002
+iface vmbr0.4002 inet manual
+
+auto vmbr0.4003
+iface vmbr0.4003 inet manual
+
+auto vmbr0.4001
+iface vmbr0.4001 inet manual
+
+auto vmbr4000
+iface vmbr4000 inet static
+	address 10.10.0.17/24
+	bridge-ports vmbr0.4000
+	bridge-stp off
+	bridge-fd 0
+
+auto vmbr4002
+iface vmbr4002 inet manual
+	bridge-ports vmbr0.4002
+	bridge-stp off
+	bridge-fd 0
+
+auto vmbr4003
+iface vmbr4003 inet manual
+	bridge-ports vmbr0.4003
+	bridge-stp off
+	bridge-fd 0
+
+auto vmbr4001
+iface vmbr4001 inet manual
+	bridge-ports vmbr0.4001
+	bridge-stp off
+	bridge-fd 0
+
+source /etc/network/interfaces.d/*

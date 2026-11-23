@@ -1,0 +1,8 @@
+[
+  {"id": 9352, "vlan": 4000, "name": "Internal storage", "server": [{"server_number": 2424209}, {"server_number": 558374}]},
+  {"id": 14083, "vlan": 4001, "name": "Public distribution", "server": [{"server_number": 2424209}]},
+  {"id": 16051, "vlan": 4002, "name": "ellanet internal", "server": [{"server_number": 2424209}]},
+  {"id": 27671, "vlan": 4003, "name": "fdh internal", "server": [{"server_number": 2424209}]},
+  {"id": 29960, "vlan": 4004, "name": "fdh cloud internal", "server": [{"server_number": 2424209}]},
+  {"id": 1, "vlan": 9, "name": "not on reference", "server": [{"server_number": 558374}]}
+]

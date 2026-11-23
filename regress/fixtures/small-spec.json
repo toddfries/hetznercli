@@ -1,0 +1,4 @@
+{
+  "pool": "data",
+  "install": {"role": "single", "disks": ["/dev/disk/by-id/ata-small-a"]}
+}

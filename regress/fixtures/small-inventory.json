@@ -1,0 +1,4 @@
+[
+  {"path": "/dev/disk/by-id/ata-small-a", "kind": "rotational"},
+  {"path": "/dev/disk/by-id/ata-small-b", "kind": "rotational"}
+]

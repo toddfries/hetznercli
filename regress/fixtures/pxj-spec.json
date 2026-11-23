@@ -1,0 +1,5 @@
+{
+  "pool": "data",
+  "install": {"role": "mirror", "match": "nvme", "hdsize": "512G"},
+  "data": {"level": "raidz2", "match": "rest", "spare": 0, "special": "install-tails"}
+}

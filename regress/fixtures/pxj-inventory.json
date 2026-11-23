@@ -1,0 +1,18 @@
+[
+  {"path": "/dev/sda", "kind": "rotational"},
+  {"path": "/dev/sdb", "kind": "rotational"},
+  {"path": "/dev/sdc", "kind": "rotational"},
+  {"path": "/dev/sdd", "kind": "rotational"},
+  {"path": "/dev/sde", "kind": "rotational"},
+  {"path": "/dev/sdf", "kind": "rotational"},
+  {"path": "/dev/sdg", "kind": "rotational"},
+  {"path": "/dev/sdk", "kind": "rotational"},
+  {"path": "/dev/sdh", "kind": "rotational"},
+  {"path": "/dev/sdi", "kind": "rotational"},
+  {"path": "/dev/sdj", "kind": "rotational"},
+  {"path": "/dev/sdl", "kind": "rotational"},
+  {"path": "/dev/sdm", "kind": "rotational"},
+  {"path": "/dev/sdn", "kind": "rotational"},
+  {"path": "/dev/nvme0n1", "kind": "nvme"},
+  {"path": "/dev/nvme1n1", "kind": "nvme"}
+]
