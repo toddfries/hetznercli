@@ -18,10 +18,18 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use FindBin;
 use Getopt::Std;
-use POSIX qw(strftime);
-use URI::Escape qw( uri_escape_utf8 );
 
+use lib "$FindBin::Bin/lib";
+
+use Hetznercli::Addr;
+use Hetznercli::Ask;
+use Hetznercli::Fail;
+use Hetznercli::Market;
+use Hetznercli::Subnet;
+use Hetznercli::Traffic;
+use Hetznercli::Vswitch;
 use WWW::Hetzner;
 
 
@@ -39,9 +47,17 @@ our $opt_D; # market_search, disk size min
 our $opt_M; # market_search, mem size min
 our $opt_X = "Ent"; # market_search, text search string
 our $opt_O; # market_search, sort order
+our $opt_f; # traffic from, YYYY-MM or YYYY-MM-DD
+our $opt_t; # traffic to, YYYY-MM or YYYY-MM-DD
+our $opt_i; # server number, product id, or address
+our $opt_n; # ptr name
+our $opt_r; # reference server number
+our $opt_k; # stored ssh key fingerprint
+our $opt_T; # market_order rehearsal (test=true)
+our $argc = 0;
 
 
-getopts('c:p:vC:D:M:O:X:');
+getopts('c:p:vC:D:M:O:X:f:t:i:n:r:k:T');
 
 my $conf = $opt_c;
 
@@ -69,60 +85,41 @@ if ($opt_p eq "ip") {
 }
 
 if($opt_p eq "servers") {
-	my @servers = $hetzner->servers;
-
-	foreach my $srvr (@servers) {
-		my $ip = $srvr->ip;
-		my @sub = @{$srvr->get('subnet')};
-		printf "%d %12s: %s\n",
-			$srvr->get('server_number'),
-			$srvr->get('server_name'),
-			$srvr->get('paid_until'),
-		;
-		my $server_ip = $srvr->get('server_ip');
-		my $server_gw = $srvr->get('ip')->get('gateway');
-		if (!defined($server_gw)) {
-			$server_gw = "<undef>";
-		}
-		printf "\t%15s gw %15s\n",
-			$server_ip,
-			$server_gw,
-		;
-		printf "\t%s/%s\n",
-			$sub[0]->{ip},
-			$sub[0]->{mask},
-		;
-		my ($i,$o,$s) = $srvr->traffic;
-		if (defined($i) && defined($o) && defined($s)) {
-			printf "\ttraffic in/out/sum = %f/%f/%f\n", $i, $o, $s;
-		}
-		my $ptr = $srvr->rdns;
-		if (defined($ptr)) {
-			printf "\trdns %s ptr %s\n", $server_ip, $ptr;
-		}
-		my $cancel = $srvr->cancel;
-		if (defined($cancel)) {
-			printf "\tcancel earliest %s, status %s, ",
-				$cancel->get('earliest_cancellation_date'),
-				$cancel->get('cancelled'),
-			;
-			my $cdate = $cancel->get('cancellation_date');
-			if ($cdate ne "<undef>") {
-				printf "date %s, ", $cdate;
-			}
-			my $reason = $cancel->get('cancellation_reason');
-			if (ref($reason) eq "ARRAY") {
-				print "reasons [";
-				foreach my $r (@{$reason}) {
-					printf "'%s',", $r;
-				}
-				print "]\n";
-			}
-		}
-		#my $fire = $srvr->firewall;
-		#print recurse_dump($fire);
+	my $parsed = $hetzner->get("server");
+	api_exit($parsed, "no servers");
+	my $subs = $hetzner->get("subnet");
+	my $subfail = Hetznercli::Fail::classify($subs);
+	if ($subfail) {
+		printf "subnet %s %s %s\n", $subfail->{status}, $subfail->{code}, $subfail->{message};
 	}
-	#print recurse_dump($parsed);
+	my @subrows = Hetznercli::Subnet::rows($subs);
+	foreach my $row (@{ $parsed }) {
+		my $sv = (ref($row) eq "HASH" && ref($row->{server}) eq "HASH")
+			? $row->{server} : $row;
+		next if ref($sv) ne "HASH";
+		my $num = defined($sv->{server_number}) ? $sv->{server_number} : "";
+		my $name = defined($sv->{server_name}) ? $sv->{server_name} : "";
+		my $paid = defined($sv->{paid_until}) ? $sv->{paid_until} : "";
+		my $addr = Hetznercli::Addr::host_from_server($sv);
+		my $gw = Hetznercli::Subnet::gateway_for(\@subrows, $num);
+		$addr = "<none>" if !defined($addr) || $addr eq "";
+		$gw = "<none>" if !defined($gw) || $gw eq "";
+		printf "%s %s paid %s\n", $num, $name, $paid;
+		printf "\t%s gw %s\n", $addr, $gw;
+		if (defined($sv->{server_ip}) && $sv->{server_ip} =~ /^\d+\.\d+\.\d+\.\d+\z/) {
+			printf "\tipv4 %s\n", $sv->{server_ip};
+		}
+		if ($addr ne "<none>") {
+			my $ptr = $hetzner->rdns_get($addr);
+			if (ref($ptr) eq "HASH" && $ptr->{missing}) {
+				print "\tptr unset\n";
+			} elsif (ref($ptr) eq "HASH" && $ptr->{error} && !defined($ptr->{ptr})) {
+				printf "\tptr error %s\n", $ptr->{error};
+			} elsif (ref($ptr) eq "HASH") {
+				printf "\tptr %s\n", (defined($ptr->{ptr}) ? $ptr->{ptr} : "");
+			}
+		}
+	}
 	exit(0);
 }
 
@@ -183,134 +180,337 @@ if($opt_p eq "storagebox") {
 }
 
 if($opt_p eq "server_transactions") {
-	my $call = "order/server/transaction";
-	my $parsed = $hetzner->get($call);
+	my $parsed = $hetzner->get("order/server/transaction");
+	api_exit($parsed, "no server transactions");
+	if (ref($parsed) eq "ARRAY" && !@{ $parsed }) {
+		print "no server transactions\n";
+		exit(0);
+	}
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "market_transactions") {
-	my $call = "order/server_market/transaction";
-	my $parsed = $hetzner->get($call);
+	my $parsed = $hetzner->get("order/server_market/transaction");
+	api_exit($parsed, "no market transactions");
+	if (ref($parsed) eq "ARRAY" && !@{ $parsed }) {
+		print "no market transactions\n";
+		exit(0);
+	}
 	print recurse_dump($parsed);
 	exit(0);
 }
 
 if($opt_p eq "traffic") {
-	my $call = "traffic";
-	my $type="month";
-	my $from=uri_escape_utf8("2017-01-01");
-	my $to=uri_escape_utf8("2017-12-31");
-	$call .= "?type=$type";
-	$call .= "&from=$from";
-	$call .= "&to=$to";
-	my $parsed = $hetzner->get($call);
-	print recurse_dump($parsed);
+	my $window = Hetznercli::Traffic::window(from => $opt_f, to => $opt_t);
+	if ($window->{error}) {
+		print "$window->{error}\n";
+		exit(1);
+	}
+	my $parsed = $hetzner->get("server");
+	api_exit($parsed, "no servers");
+	my @targets;
+	foreach my $row (@{ $parsed }) {
+		my $sv = (ref($row) eq "HASH" && ref($row->{server}) eq "HASH")
+			? $row->{server} : $row;
+		next if ref($sv) ne "HASH";
+		if (defined($opt_i) && "$sv->{server_number}" ne "$opt_i") {
+			next;
+		}
+		my $prefix = Hetznercli::Traffic::prefix($sv->{server_ipv6_net});
+		my $ip = $sv->{server_ip};
+		$ip = undef if !defined($ip) || $ip !~ /^\d+\.\d+\.\d+\.\d+\z/;
+		next if (!defined($prefix) || $prefix eq "") && !defined($ip);
+		push @targets, {
+			label => ($sv->{server_number} // "") . " " . ($sv->{server_name} // ""),
+			prefix => $prefix,
+			ip => $ip,
+		};
+	}
+	if (!@targets) {
+		print "no v6 subnet to query\n";
+		exit(1);
+	}
+	my $form = Hetznercli::Traffic::form($window, \@targets);
+	my $got = $hetzner->post("traffic", $form);
+	api_exit($got, "no traffic");
+	my $text = Hetznercli::Traffic::format($got, \@targets);
+	print $text;
+	exit(1) if $text =~ /^traffic reply had no data/;
 	exit(0);
 }
 
-if($opt_p eq "market_search") {
-
-	# move defaults to WWW::Hetzner::MarketSearch once created
-	if (!defined($opt_C)) {
-		$opt_C = 5682;
-	}
-	if (!defined($opt_D)) {
-		$opt_D = 4096;
-	}
-	if (!defined($opt_M)) {
-		$opt_M = 48;
-	}
-
-	my $call = "order/server_market/product";
-	our $argc = 0;
-	sub addvar {
-		my ($var,$val) = @_;
-		my $str = "";
-		if ($argc++ > 0) {
-			$str .= "&";
-		} else {
-			$str .= "?";
+if($opt_p eq "market" || $opt_p eq "market_search") {
+	my $filtered = $opt_p eq "market_search";
+	if ($filtered) {
+		if (!defined($opt_C)) {
+			$opt_C = 5682;
 		}
-		$str .= $var."=".$val;
+		if (!defined($opt_D)) {
+			$opt_D = 4096;
+		}
+		if (!defined($opt_M)) {
+			$opt_M = 48;
+		}
 	}
-		
-	if (length($opt_X) > 0) {
-		$call .= addvar('search',$opt_X);
+	my $call = "order/server_market/product";
+	if ($filtered) {
+		$argc = 0;
+		if (defined($opt_X) && length($opt_X) > 0) {
+			$call .= addvar('search', $opt_X);
+		}
+		if (defined($opt_C)) {
+			$call .= addvar('min_cpu_benchmark', $opt_C);
+		}
+		if (defined($opt_M)) {
+			$call .= addvar('min_memory_size', $opt_M);
+		}
 	}
-	if (defined($opt_C)) {
-		$call .= addvar('min_cpu_benchmark',$opt_C);
-	}
-	if (defined($opt_M)) {
-		$call .= addvar('min_memory_size',$opt_M);
-	}
-
 	my $parsed = $hetzner->get($call);
-	#print recurse_dump($parsed);
-	#print "\n\n";
-
-	printf "%8s %7s %5s %5s %5s %3s %6s %10s %3s %6s\n",
-		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
-	my $now = time();
-	my @res;
+	api_exit($parsed, "no auction servers");
+	if (ref($parsed) ne "ARRAY") {
+		print "parsed is a ".ref($parsed)." and contains: ";
+		print Dumper($parsed);
+		exit(1);
+	}
+	my @res = @{ $parsed };
 	if (defined($opt_O)) {
 		if ($opt_O eq "mem") {
 			@res = sort {
-			    $a->{product}->{memory_size} <=>
-			    $b->{product}->{memory_size} } @{$parsed};
+				($a->{product}->{memory_size} // 0) <=>
+				($b->{product}->{memory_size} // 0)
+			} @res;
 		} elsif ($opt_O eq "price") {
 			@res = sort {
-			    $a->{product}->{price} <=>
-			    $b->{product}->{price} } @{$parsed};
+				($a->{product}->{price} // 0) <=>
+				($b->{product}->{price} // 0)
+			} @res;
 		} else {
 			print "market_search: unhandled sort type ${opt_O}\n";
 		}
-	} else {
-		if (ref($parsed) eq "ARRAY") {
-			@res = @{$parsed};
-		} else {
-			print "parsed is a ".ref($parsed)." and contains: ";
-			print Dumper($parsed);
+	}
+	printf "%8s %7s %5s %5s %5s %3s %6s %10s %3s %6s\n",
+		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
+	my $shown = 0;
+	foreach my $server (@res) {
+		next if ref($server) ne "HASH";
+		my $product = $server->{product};
+		next if ref($product) ne "HASH";
+		if ($filtered) {
+			next if !Hetznercli::Market::keep($product, {
+				cpu => $opt_C, mem => $opt_M, disk => $opt_D,
+			});
+		}
+		print Hetznercli::Market::format_row($product);
+		$shown++;
+	}
+	if (!$filtered) {
+		print "auction servers: $shown\n";
+	}
+	exit(0);
+}
+
+if($opt_p eq "market_show" || $opt_p eq "market_order") {
+	if (!defined($opt_i) || $opt_i !~ /^\d+\z/) {
+		print "market_show needs -i <product id>\n";
+		exit(1);
+	}
+	my $parsed = $hetzner->get("order/server_market/product/$opt_i");
+	api_exit($parsed, "auction $opt_i not found");
+	my $product = (ref($parsed) eq "HASH" && ref($parsed->{product}) eq "HASH")
+		? $parsed->{product} : $parsed;
+	if (ref($product) ne "HASH") {
+		print "auction $opt_i had no product\n";
+		exit(1);
+	}
+	print Hetznercli::Market::stats($product);
+	if ($opt_p eq "market_show") {
+		exit(0);
+	}
+	my $keyparsed = $hetzner->get("key");
+	api_exit($keyparsed, "no stored ssh keys");
+	my @keys = Hetznercli::Market::key_rows($keyparsed);
+	if (!@keys) {
+		print "no stored ssh keys\n";
+		exit(1);
+	}
+	my $chosen;
+	if (defined($opt_k)) {
+		($chosen) = grep { $_->{fingerprint} eq $opt_k } @keys;
+		if (!$chosen) {
+			print "fingerprint is not a stored Robot key\n";
 			exit(1);
 		}
+	} else {
+		my $rec = Hetznercli::Market::recommend_key(\@keys);
+		my $text = "Stored Robot keys. Recommended is the ED25519 key.\n\n";
+		my @pairs;
+		my $n = 1;
+		my $def;
+		foreach my $k (@keys) {
+			$text .= "$n $k->{name} $k->{type} $k->{fingerprint}\n";
+			push @pairs, ["$n", "$n"];
+			if (!defined($def) && $k->{fingerprint} eq $rec->{fingerprint}) {
+				$def = "$n";
+			}
+			$n++;
+		}
+		$text .= "\nPick a key, no to stop, or z to explain in the chat.\n";
+		push @pairs, ["no", "n"], ["z", "z"];
+		my $ans = Hetznercli::Ask::choose($text, \@pairs, $def);
+		if (!defined($ans) || $ans eq "n" || $ans eq "") {
+			print "not ordering\n";
+			exit(0);
+		}
+		if ($ans eq "z") {
+			print "other: explain in the chat\n";
+			exit(0);
+		}
+		if ($ans =~ /^\d+\z/ && $ans >= 1 && $ans <= @keys) {
+			$chosen = $keys[$ans - 1];
+		} else {
+			print "not ordering\n";
+			exit(0);
+		}
 	}
-	
-	foreach my $server ( @res ) {
-
-		my $dc   = $server->{product}->{datacenter};
-		my $mem  = $server->{product}->{memory_size};
-		my $cpub = $server->{product}->{cpu_benchmark};
-		my $disk = $server->{product}->{hdd_count} * $server->{product}->{hdd_size};
-
-		if ($cpub < $opt_C) {
-			next;
-		}
-		if ($mem < $opt_M) {
-			next;
-		}
-		if ($disk < $opt_D) {
-			next;
-		}
-		my $traffic = $server->{product}->{traffic};
-		$traffic =~ s/ TB$//;
-		$dc =~ s/-DC/-/;
-
-		my $nextreduce = $server->{product}->{next_reduce};
-		my $nextr = strftime("%m%d %H:%M",localtime($now+$nextreduce));
-		
-	
-		printf "%8s %7d %5s %5d %5d %3d %6.2f %10s %3s %s\n",
-			$dc,
-			$server->{product}->{id},
-			$server->{product}->{name},
-			$cpub,
-			$disk,
-			$server->{product}->{memory_size},
-			$server->{product}->{price},
-			$nextr,
-			$traffic,
-			$server->{product}->{cpu},
+	my $built = Hetznercli::Market::order_form($product->{id}, $chosen->{fingerprint}, $opt_T);
+	if ($built->{error}) {
+		print "$built->{error}\n";
+		exit(1);
 	}
+	my $ask = Hetznercli::Market::order_text($built->{form});
+	$ask .= "\n";
+	if ($opt_T) {
+		$ask .= "Rehearsal. Robot does not process test=true.\n";
+	} else {
+		$ask .= "This places a real order. The account allows about 20 order calls a day.\n";
+	}
+	$ask .= "yes to POST, no to stop, z to explain in the chat.\n";
+	my $go = Hetznercli::Ask::choose($ask, [["no", "n"], ["yes", "y"], ["z", "z"]], "no");
+	if (!defined($go) || $go eq "n" || $go eq "") {
+		print "not posting\n";
+		exit(0);
+	}
+	if ($go eq "z") {
+		print "other: explain in the chat\n";
+		exit(0);
+	}
+	if ($go ne "y") {
+		print "not posting\n";
+		exit(0);
+	}
+	my $posted = $hetzner->post("order/server_market/transaction", $built->{form});
+	api_exit($posted, "order refused");
+	print recurse_dump($posted);
+	exit(0);
+}
+
+if($opt_p eq "rdns_set") {
+	if (!defined($opt_i) || $opt_i !~ /^[0-9A-Fa-f:.]+$/) {
+		print "rdns_set needs -i <address>\n";
+		exit(1);
+	}
+	if (!defined($opt_n) || $opt_n !~ /^[A-Za-z0-9._-]+$/) {
+		print "rdns_set needs -n <ptr name>\n";
+		exit(1);
+	}
+	my $cur = $hetzner->rdns_get($opt_i);
+	if (ref($cur) eq "HASH" && $cur->{missing}) {
+		print "ptr $opt_i unset\n";
+	} elsif (ref($cur) eq "HASH" && defined($cur->{ptr})) {
+		print "ptr $opt_i $cur->{ptr}\n";
+	} elsif (ref($cur) eq "HASH" && $cur->{error}) {
+		printf "ptr %s error %s\n", $opt_i, $cur->{error};
+	}
+	my $ask = "Set PTR of $opt_i to $opt_n?\n\nyes to POST, no to stop, z to explain in the chat.\n";
+	my $go = Hetznercli::Ask::choose($ask, [["no", "n"], ["yes", "y"], ["z", "z"]], "no");
+	if (!defined($go) || $go eq "n" || $go eq "") {
+		print "not posting\n";
+		exit(0);
+	}
+	if ($go eq "z") {
+		print "other: explain in the chat\n";
+		exit(0);
+	}
+	if ($go ne "y") {
+		print "not posting\n";
+		exit(0);
+	}
+	my $set = $hetzner->rdns_set($opt_i, $opt_n);
+	if (ref($set) ne "HASH") {
+		print "rdns set failed\n";
+		exit(1);
+	}
+	if ($set->{error} && !defined($set->{ptr})) {
+		printf "ptr error %s %s\n", $set->{error}, ($set->{message} // "");
+		exit(1);
+	}
+	printf "ptr %s %s\n", $opt_i, ($set->{ptr} // "");
+	exit(0);
+}
+
+if($opt_p eq "vswitch_copy") {
+	if (!defined($opt_r) || $opt_r !~ /^\d+\z/) {
+		print "vswitch_copy needs -r <reference server number>\n";
+		exit(1);
+	}
+	if (!defined($opt_i) || $opt_i !~ /^\d+\z/) {
+		print "vswitch_copy needs -i <target server number>\n";
+		exit(1);
+	}
+	my $parsed = $hetzner->get("vswitch");
+	api_exit($parsed, "no vswitches");
+	my $rows = hydrate_vswitches($hetzner, [WWW::Hetzner::vswitch_rows($parsed)]);
+	my @unknown = Hetznercli::Vswitch::unknown_membership($rows);
+	if (@unknown) {
+		print "vSwitch membership unknown for " . join(" ", @unknown) . "\n";
+		exit(1);
+	}
+	my @missing = Hetznercli::Vswitch::missing($rows, $opt_r, $opt_i);
+	print "vSwitch delta, reference $opt_r, target $opt_i:\n";
+	if (!@missing) {
+		print "  none\nnot posting\n";
+		exit(0);
+	}
+	foreach my $one (@missing) {
+		printf "  %s vlan %s %s\n",
+			($one->{id} // ""),
+			($one->{vlan} // ""),
+			($one->{name} // "");
+	}
+	my $ask = "Attach target $opt_i to these vSwitches?\n\nyes to POST, no to stop, z to explain in the chat.\n";
+	my $go = Hetznercli::Ask::choose($ask, [["no", "n"], ["yes", "y"], ["z", "z"]], "no");
+	if (!defined($go) || $go eq "n" || $go eq "") {
+		print "not posting\n";
+		exit(0);
+	}
+	if ($go eq "z") {
+		print "other: explain in the chat\n";
+		exit(0);
+	}
+	if ($go ne "y") {
+		print "not posting\n";
+		exit(0);
+	}
+	if (attach_missing($hetzner, \@missing, $opt_i)) {
+		exit(1);
+	}
+	my $again = $hetzner->get("vswitch");
+	api_exit($again, "vswitch recheck failed");
+	my $checked = hydrate_vswitches($hetzner, [WWW::Hetzner::vswitch_rows($again)]);
+	my @still_unknown = Hetznercli::Vswitch::unknown_membership($checked);
+	if (@still_unknown) {
+		print "membership still unknown after POST for " . join(" ", @still_unknown) . "\n";
+		exit(1);
+	}
+	my @still = Hetznercli::Vswitch::missing($checked, $opt_r, $opt_i);
+	my %want = map { $_->{id} => 1 } @missing;
+	@still = grep { $want{$_->{id}} } @still;
+	if (@still) {
+		print "GET after POST still missing " . join(" ", map { $_->{id} } @still) . "\n";
+		exit(1);
+	}
+	print "GET shows $opt_i on each posted vSwitch\n";
 	exit(0);
 }
 
@@ -319,7 +519,93 @@ if (!defined($p)) {
 	$p = "<undef>";
 }
 printf "personality '%s' not found\n", $p;
+print "personalities: ip servers reset subnet rdns rdns_set sshkey products storagebox server_transactions market_transactions traffic market market_search market_show market_order vswitch_copy\n";
 exit(1);
+
+sub api_exit {
+	my ($parsed, $empty) = @_;
+	if (!defined($parsed)) {
+		print "api empty reply\n";
+		exit(1);
+	}
+	if (!ref($parsed)) {
+		return if $parsed eq "";
+		print "api $parsed\n";
+		exit(1);
+	}
+	my $fail = Hetznercli::Fail::classify($parsed);
+	return if !$fail;
+	if ($fail->{exit} == 2) {
+		print "$empty\n";
+	} else {
+		printf "api %s %s %s\n", $fail->{status}, $fail->{code}, $fail->{message};
+	}
+	exit($fail->{exit});
+}
+
+sub addvar {
+	my ($var,$val) = @_;
+	our $argc;
+	my $str = "";
+	if ($argc++ > 0) {
+		$str .= "&";
+	} else {
+		$str .= "?";
+	}
+	$str .= $var."=".$val;
+}
+
+sub hydrate_vswitches {
+	my ($api, $rows) = @_;
+	my @full;
+	foreach my $row (@{ $rows }) {
+		if (ref($row->{server}) ne "ARRAY") {
+			my $one = $api->get("vswitch/$row->{id}");
+			my $fail = Hetznercli::Fail::classify($one);
+			if ($fail) {
+				die "vswitch $row->{id}: $fail->{code} $fail->{message}\n";
+			}
+			my @detail = WWW::Hetzner::vswitch_rows($one);
+			die "vswitch $row->{id} detail missing\n" if @detail != 1;
+			$row = $detail[0];
+		}
+		push @full, $row;
+	}
+	return \@full;
+}
+
+sub attach_missing {
+	my ($api, $rows, $target) = @_;
+	foreach my $row (@{ $rows }) {
+		my $last;
+		my $posted = 0;
+		foreach my $try (1 .. 3) {
+			$last = $api->vswitch_attach($row->{id}, $target);
+			my $code = "";
+			my $message = "";
+			if (ref($last) eq "HASH" && ref($last->{error}) eq "HASH") {
+				$code = $last->{error}{code} || "";
+				$message = $last->{error}{message} || "";
+			}
+			if (!defined($last)) {
+				print "attach $row->{id} failed: empty reply\n";
+				return 1;
+			}
+			if ($code eq "") {
+				print "posted $row->{id}\n";
+				$posted = 1;
+				last;
+			}
+			if ($code ne "VSWITCH_IN_PROCESS" || $try == 3) {
+				print "attach $row->{id} failed: $code $message\n";
+				return 1;
+			}
+			sleep 5;
+		}
+		return 1 if !$posted;
+	}
+	return 0;
+}
 
 sub recurse_dump {
 	my ($item) = @_;
