@@ -181,7 +181,8 @@ if (defined($vswitch_file)) {
 	}
 	$rows = [WWW::Hetzner::vswitch_rows($parsed)];
 }
-if ($api && $rows) {
+sub hydrate_rows {
+	my ($api, $rows) = @_;
 	my @full;
 	foreach my $row (@{ $rows }) {
 		if (ref($row->{server}) ne 'ARRAY') {
@@ -195,7 +196,11 @@ if ($api && $rows) {
 		}
 		push @full, $row;
 	}
-	$rows = \@full;
+	return \@full;
+}
+
+if ($api && $rows) {
+	$rows = hydrate_rows($api, $rows);
 }
 if ($rows && defined($reference) && defined($server)) {
 	my @unknown = Hetznercli::Vswitch::unknown_membership($rows);
@@ -225,10 +230,17 @@ if ($yes_vswitch) {
 		print "posted $row->{id}\n";
 	}
 	my $again = $api->get('vswitch');
-	my @rows = WWW::Hetzner::vswitch_rows($again);
+	if (ref($again) eq 'HASH' && $again->{error}) {
+		die "vswitch recheck: $again->{error}{code} $again->{error}{message}\n";
+	}
+	my $checked = hydrate_rows($api, [WWW::Hetzner::vswitch_rows($again)]);
+	my @unknown = Hetznercli::Vswitch::unknown_membership($checked);
+	if (@unknown) {
+		die "membership still unknown after POST for " . join(' ', @unknown) . "\n";
+	}
 	my %want = map { $_->{id} => 1 } @missing;
 	my @still = grep { $want{ $_->{id} } }
-		Hetznercli::Vswitch::missing(\@rows, $reference, $server);
+		Hetznercli::Vswitch::missing($checked, $reference, $server);
 	if (@still) {
 		die "GET after POST still missing "
 			. join(' ', map { $_->{id} } @still) . "\n";
