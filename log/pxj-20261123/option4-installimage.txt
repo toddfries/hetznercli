@@ -1,0 +1,17 @@
+option 4, stopped before any install. 2026-11-23.
+
+installimage on this rescue image does not offer a ZFS root.
+
+Tree: /root/.oldroot/nfs/install
+Wrapper: installimage (3659 bytes, dated 2025-10-27). It regenerates a config from the NFS templates. It was not executed.
+
+A search of that tree for the word zfs returned no hits.
+
+functions.sh documents PART filesystems as ext2, ext3, ext4, btrfs, reiserfs, xfs, swap, and esp. The btrfs note says there is no support for btrfs multi-device volumes. RAID in this tool is SWRAID (mdraid), levels chosen from drive count.
+
+Debian templates present:
+  configs/simple-debian64-noraid
+  configs/simple-debian64-raid
+  configs/simple-debian64-raid-lvm
+
+No disk was written. kvm pid 5360 was left running.
