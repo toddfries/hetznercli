@@ -76,6 +76,7 @@ like($check, qr/Set reverse DNS on the host v6/, 'checklist sets reverse DNS');
 like($check, qr/host name plus \.rescue/, 'checklist names the rescue ssh alias');
 like($check, qr/Pin the physical NIC by PCI path/, 'checklist pins the NIC');
 like($check, qr/~\/\.config\/hetzner\/todd\.conf/, 'checklist reads the todd hash file');
+like($check, qr/Let's Encrypt certificate for the host name on port 8006/, 'checklist orders the node certificate');
 
 my @kvm = Hetznercli::Kvm::argv(
 	disks => $pxj->{install_disks},

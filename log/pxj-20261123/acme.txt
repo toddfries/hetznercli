@@ -1,0 +1,20 @@
+pxj Let's Encrypt certificate, 2026-11-23.
+The account key is not in this file.
+
+Account name default. Contact postmaster@fdh.bz.
+Directory https://acme-v02.api.letsencrypt.org/directory
+Terms https://letsencrypt.org/documents/LE-SA-v1.8-July-06-2026.pdf
+Node config: acme: account=default,domains=pxj.fdh.bz
+
+HTTP-01 for pxj.fdh.bz validated. pveproxy was restarted.
+The served file is /etc/pve/nodes/pxj/pveproxy-ssl.pem
+  issuer Let's Encrypt CN=YR2
+  subject CN=pxj.fdh.bz
+  SAN DNS:pxj.fdh.bz
+  notBefore 2026-11-23 21:08:17 GMT
+  notAfter 2027-02-21 21:08:16 GMT
+curl https://pxj.fdh.bz:8006/ verified the chain.
+pve-daily-update.timer is enabled. pveupdate renews that file when
+it expires within 30 days.
+
+The procedure for the next host is ~/git/tex/docs/procedure/hetzner/acme

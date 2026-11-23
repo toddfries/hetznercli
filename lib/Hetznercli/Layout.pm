@@ -162,6 +162,7 @@ sub checklist {
 	push @lines, 'SSH rescue alias is the host name plus .rescue; the installed alias is the host name';
 	push @lines, 'Pin the physical NIC by PCI path before the first disk boot';
 	push @lines, 'Create user todd from ~/.config/hetzner/todd.conf and do not prompt for a password';
+	push @lines, 'Order a Let\'s Encrypt certificate for the host name on port 8006';
 	if ($planned->{special}) {
 		push @lines, 'After boot, cut one GPT partition from each free tail';
 		push @lines, "The data pool is $planned->{level} plus a mirror of the two tails";
