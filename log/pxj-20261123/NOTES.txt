@@ -63,3 +63,8 @@ the key, write bridges, carve the NVMe tails, zpool the HDDs from by-id.
 Phase 3 howto-setup stays parked.
 hcli still calls Server->ip and the old get(); documented, not fixed.
 Neither repo was pushed.
+
+Later the same day
+kvm pid 5360 was stopped with nothing written. The install that finished
+is the automatic one in option2/boot.txt. The guest powered off inside
+rescue. The metal is still the rescue system.

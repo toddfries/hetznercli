@@ -1,0 +1,19 @@
+[global]
+keyboard = "en-us"
+country = "us"
+fqdn = "pxj.fdh.bz"
+mailto = "root@fdh.bz"
+timezone = "America/Chicago"
+root-password-hashed = "HASH_NEEDED"
+root-ssh-keys = [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKW63Z0N0kQuyQupT8WyIlOFKXp6hdjTYxgGuBUZCW1b todd@i5.fries.net" ]
+reboot-mode = "power-off"
+
+[network]
+source = "from-dhcp"
+
+[disk-setup]
+filesystem = "zfs"
+zfs.raid = "raid1"
+zfs.ashift = 12
+zfs.hdsize = 512
+disk-list = ["nvme0n1", "nvme1n1"]

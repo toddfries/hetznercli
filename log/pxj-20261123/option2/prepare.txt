@@ -1,0 +1,113 @@
+=== 2026-11-23T20:13:29Z prepare-iso start ===
+command: proxmox-auto-install-assistant prepare-iso /root/proxmox-ve_9.2-1.iso --fetch-from iso --answer-file /root/pxj-answer.toml --output /root/proxmox-ve_9.2-1-auto.iso
+version: proxmox-installer-common v9.2.9
+input exists:
+-rw-r--r-- 1 root root 1706178560 May 21  2026 /root/proxmox-ve_9.2-1.iso
+input sha256:
+4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c  /root/proxmox-ve_9.2-1.iso
+kvm 5360:
+   5360    01:51:50 /usr/bin/kvm -smp 2 -usb -device usb-tablet -no-fd-bootchk -drive file=/dev/nvme0n1,index=0,media=disk,format=raw -drive file=/dev/nvme1n1,index=1,media=disk,format=raw -drive file=/root/proxmox-ve_9.2-1-serial.iso,index=2,media=cdrom,format=raw -boot once=d,order=c,menu=on -m 2048 -serial tcp:127.0.0.1:2111,server=on,wait=off -monitor tcp:127.0.0.1:1111,server=on,wait=off -nographic -net nic -net user,hostfwd=tcp::2022-:22,hostfwd=tcp::3022-:2022,hostfwd=tcp::8006-:8006
+wr_sectors before:
+nvme0n1 wr_sectors=0
+nvme1n1 wr_sectors=0
+=== prepare-iso combined output ===
+Checking provided answer file...
+Copying source ISO to temporary location...
+Preparing ISO...
+Moving prepared ISO to target location...
+Final ISO is available at /root/proxmox-ve_9.2-1-auto.iso.
+=== exit code: 0 ===
+=== outputs ===
+-rw-r--r-- 1 root root 1707278336 Nov 23 21:13 /root/proxmox-ve_9.2-1-auto.iso
+-rw-r--r-- 1 root root 1706178560 May 21  2026 /root/proxmox-ve_9.2-1.iso
+stock sha256 after:
+4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c  /root/proxmox-ve_9.2-1.iso
+auto iso size and sha256:
+size=1707278336
+cfa7305f1c931cc698b5289dc15074293cab4c98cd435625c77860b9c4eb2316  /root/proxmox-ve_9.2-1-auto.iso
+kvm 5360 after:
+   5360    01:51:58
+wr_sectors after:
+nvme0n1 wr_sectors=0
+nvme1n1 wr_sectors=0
+=== end 2026-11-23T20:13:40Z ===
+=== 2026-11-23T20:14:32Z inspect-iso ===
+Inspect a Proxmox installer ISO and report whether it has been prepared for
+automated installation, which fetch mode it uses, and -- for fetch-from 'iso'
+-- the embedded answer file with sensitive fields redacted.
+
+The embedded answer file is always re-serialized through the TOML formatter
+so its on-screen shape stays consistent regardless of '--show-sensitive';
+comments and the original key ordering are not preserved.
+
+USAGE:
+  proxmox-auto-install-assistant inspect-iso [OPTIONS] <INPUT>
+
+ARGUMENTS:
+  <INPUT>  Path to the ISO to inspect.
+
+OPTIONS:
+      --show-sensitive  Print sensitive fields (root password, subscription key,
+                        HTTP auth token) verbatim instead of as <redacted>.
+  -h, --help            Print this help
+  -V, --version         Print version
+
+=== inspect ===
+Source ISO:    /root/proxmox-ve_9.2-1-auto.iso
+Product:       Proxmox VE 9.2-1
+Auto-install:  enabled
+Fetch mode:    iso
+
+Embedded answer file (/answer.toml):
+[disk-setup]
+disk-list = [
+    "nvme0n1",
+    "nvme1n1",
+]
+filesystem = "zfs"
+
+[disk-setup.zfs]
+ashift = 12
+hdsize = 512
+raid = "raid1"
+
+[global]
+country = "us"
+fqdn = "pxj.fdh.bz"
+keyboard = "en-us"
+mailto = "root@fdh.bz"
+reboot-mode = "power-off"
+root-password-hashed = "<redacted>"
+root-ssh-keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKW63Z0N0kQuyQupT8WyIlOFKXp6hdjTYxgGuBUZCW1b todd@i5.fries.net"]
+timezone = "America/Chicago"
+
+[network]
+source = "from-dhcp"
+inspect rc=0
+=== root leftovers matching proxmox/tmp ===
+total 4.8G
+-rw-r--r-- 1 root root 1.6G Nov 23 21:13 proxmox-ve_9.2-1-auto.iso
+-rw-r--r-- 1 root root 1.6G May 21  2026 proxmox-ve_9.2-1.iso
+-rw-r--r-- 1 root root 1.6G Nov 23 19:17 proxmox-ve_9.2-1-serial.iso
+-rw-r--r-- 1 root root  451 Nov 23 21:11 pxj-answer.toml
+-rw-r--r-- 1 root root  28K Nov 23 21:12 pxj-apt-setup.txt
+-rw-r--r-- 1 root root    0 Nov 23 19:21 pxj-kvm.log
+-rw-r--r-- 1 root root 3.1K Nov 23 19:23 pxj-monitor.txt
+-rw-r--r-- 1 root root 3.3K Nov 23 21:14 pxj-prepare.txt
+-rw-r--r-- 1 root root 2.3M Nov 23 19:23 pxj-screen.ppm
+-rw-r--r-- 1 root root    0 Nov 23 19:22 pxj-serial-peek2.bin
+-rw-r--r-- 1 root root    0 Nov 23 19:22 pxj-serial-peek2.txt
+-rw-r--r-- 1 root root  35K Nov 23 19:22 pxj-serial-peek.bin
+-rw-r--r-- 1 root root  35K Nov 23 19:22 pxj-serial-peek.txt
+-rw-r--r-- 1 root root 2.5M Nov 23 19:15 pxj-setup.log
+=== kvm and wr ===
+   5360    01:52:50
+nvme0n1 wr_sectors=0
+nvme1n1 wr_sectors=0
+=== embedded answer check ===
+xorriso -osirrox on -indev /root/proxmox-ve_9.2-1-auto.iso -extract /answer.toml /root/pxj-embedded-answer.toml
+extract_rc=0
+cmp /root/pxj-answer.toml /root/pxj-embedded-answer.toml -> identical
+root-password-hashed line: root-password-hashed = "HASH_NEEDED"
+HASH_NEEDED count: 1
+inspect-iso prints that field as <redacted>. The extracted /answer.toml is byte-identical to /root/pxj-answer.toml and still contains the literal placeholder, not a generated hash.
