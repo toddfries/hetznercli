@@ -73,6 +73,9 @@ my $check = Hetznercli::Layout::checklist($pxj);
 like($check, qr/hdsize: 512G/, 'checklist names hdsize');
 like($check, qr/special_small_blocks stays unset/, 'checklist leaves small blocks unset');
 like($check, qr/Set reverse DNS on the host v6/, 'checklist sets reverse DNS');
+like($check, qr/host name plus \.rescue/, 'checklist names the rescue ssh alias');
+like($check, qr/Pin the physical NIC by PCI path/, 'checklist pins the NIC');
+like($check, qr/~\/\.config\/hetzner\/todd\.conf/, 'checklist reads the todd hash file');
 
 my @kvm = Hetznercli::Kvm::argv(
 	disks => $pxj->{install_disks},

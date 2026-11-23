@@ -159,6 +159,9 @@ sub checklist {
 	}
 	push @lines, 'Disks that are not install disks stay out of the guest';
 	push @lines, 'Set reverse DNS on the host v6 to the host name';
+	push @lines, 'SSH rescue alias is the host name plus .rescue; the installed alias is the host name';
+	push @lines, 'Pin the physical NIC by PCI path before the first disk boot';
+	push @lines, 'Create user todd from ~/.config/hetzner/todd.conf and do not prompt for a password';
 	if ($planned->{special}) {
 		push @lines, 'After boot, cut one GPT partition from each free tail';
 		push @lines, "The data pool is $planned->{level} plus a mirror of the two tails";
