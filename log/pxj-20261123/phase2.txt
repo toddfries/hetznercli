@@ -1,0 +1,57 @@
+pxj phase 2 prep, 2026-11-23. Done from rescue. The metal was not booted.
+The root password hash is not in this file.
+
+Root pool, measured read-only before the edits
+rpool is a mirror of nvme0n1p3 and nvme1n1p3, bootfs rpool/ROOT/pve-1.
+Datasets the installer created:
+  rpool/ROOT/pve-1   /
+  rpool/data         /rpool/data
+  rpool/var-lib-vz   /var/lib/vz
+No separate /usr, /home, /var, or /tmp dataset. /bin and /lib are
+symlinks into /usr. /tmp is the systemd tmpfs unit tmp.mount.
+The installer network file was the qemu guest: ens3, 10.0.2.15/24,
+gateway 10.0.2.2. That copy is kept as interfaces.qemu-install.
+hosts and resolv.conf had the same qemu address. Those copies are
+hosts.qemu-install and resolv.conf.qemu-install.
+
+What was written on rpool/ROOT/pve-1
+/etc/network/interfaces follows pxi, with this host's names:
+  NIC eno2 (firmware onboard name; the path name is enp6s0, and the
+  rescue kernel calls the same port eth0 because it disables
+  predictable names). systemd NamePolicy picks onboard before path,
+  so the bridge port is eno2.
+  vmbr0 fe80::2/32 gateway fe80::1, vlan-aware, vids 2-4094
+  vmbr1 2a01:4f8:2190:1993::2/64, mtu 1500, no bridge port
+  vmbr0.4000 .4002 .4003 .4001
+  vmbr4000 10.10.0.18/24
+  vmbr4001 vmbr4002 vmbr4003 manual
+/etc/hosts maps 2a01:4f8:2190:1993::2 to pxj.fdh.bz and pxj.
+/etc/resolv.conf is search fdh.bz plus 2001:4860:4860::8888 and ::8844,
+the same resolvers pxi uses.
+/etc/ssh/sshd_config.d/2022.conf sets Port 2022 and
+PasswordAuthentication no. The installer had already placed the
+ed25519 key in /root/.ssh/authorized_keys. A missing trailing newline
+on that one line was added.
+
+NVMe tails
+Both disks gained partition 4, type BF01, name special, start sector
+1073743872, end sector 7501476494, about 3.0 TiB. The 512G root table
+was left as it was. The gap in front of partition 4 is 2047 sectors,
+so the tail starts on a 1 MiB boundary.
+
+data pool
+Created with Debian OpenZFS 2.4.4, which was built on the rescue kernel
+so the pool could be labeled. ashift=12. raidz2 of the 14 HDD WWNs.
+special mirror of the two nvme-eui part4 devices. special_small_blocks
+is 0. No cache vdev and no log vdev.
+OpenZFS refused the first create because raidz2 survives two disk
+losses and a two-way mirror survives one. The create was repeated
+with -f to accept that difference. Losing both NVMe tails loses the
+pool. The disks had no previous signatures.
+Both pools were exported. zpool import lists rpool and data, and
+neither is imported. /etc/zfs/zpool.cache on the root dataset was
+updated before the export.
+
+Not done
+The Robot boot flag is still rescue. No reset and no reboot.
+Phase 3 howto-setup is still parked. Nothing was pushed.
