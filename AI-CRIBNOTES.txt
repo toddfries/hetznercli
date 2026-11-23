@@ -30,6 +30,22 @@ sourced 20261123
 - hmarket does not call that API. It filters the public server-auction JSON. Default path keeps is_ecc and lines matching /Enterprise HDD/.
 - Hetzner publishes no Robot or Cloud sandbox. Do not point regress at the live account.
 
+## Live call notes (20261123, via ~/bin/hcli for 12h)
+
+~/bin/hcli is perl -I p5-WWW-req/lib -I p5-WWW-Hetzner/lib on ./hcli. Use that instead of installing the modules. Do not cpan.
+
+p5-WWW-Hetzner 17c1a7c (2024-05-22) renamed API get/set to vget/vset and removed the ip attribute. Servers are not always IPv4. hcli and parts of the library still call the old names.
+
+- ./hcli -p servers exits 255: no method ip on WWW::Hetzner::Server (hcli:75). Next would be hcli:76 $srvr->get, which is now vget.
+- Server::traffic, Server::rdns, IP::init, traffic::init, reset::init still call ->ip.
+- cancellation::init still calls ->get.
+- Server::firewall calls ->req, which WWW::Hetzner does not define. The hcli firewall print is commented out.
+- Account has 6 servers. 4 have server_ip and ip undef, with an IPv6 net. -p reset warns at hcli:144 on those four.
+- Detail server.ip is an array of one scalar, or undef. It is not an object with gateway. server.subnet[] is {ip, mask} only. Gateway is on the subnet list (-p subnet).
+- -p traffic still queries from=2017-01-01 to=2017-12-31 with no ip or subnet. API 400: missing ip and subnet, invalid to.
+- -p server_transactions and -p market_transactions return 404 no transactions found. hcli prints that hash and exits 0.
+- These return data: ip, subnet, rdns, sshkey, products, storagebox, market_search.
+
 ## Regress coverage (20261123)
 
 - recurse_dump sort and addvar query joining, taken from hcli source.
