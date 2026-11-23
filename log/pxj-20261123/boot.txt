@@ -1,0 +1,30 @@
+pxj disk boot, 2026-11-23. The rescue system was rebooted locally.
+No Robot rescue, reset, or boot write. The password hash is not in this file.
+
+Before the reboot, from rescue, rpool was mounted and these were written:
+  udev rule and systemd link pinning PCI 0000:06:00.0 to the name eno2
+  a oneshot that renames that PCI netdev to eno2 if the name is missing
+  initrd rebuilt for 7.0.2-6-pve and copied to both ESPs
+  both ESP initrds contain 10-pxj-nic.rules and 10-pxj-nic.link
+  user todd, uid 947, shell bash, group sudo
+  root authorized_keys gained fdc_px8r and kept fdc_px2r
+The pool was exported before the reboot. The data pool was left exported
+and was not imported from rescue.
+
+SSH on this workstation:
+  r.pxj.res uses HostKeyAlias pxj.fdh.bz.rescue
+  r.pxj and pxj use HostKeyAlias pxj.fdh.bz
+  forwards use index 15
+  the raw address line was removed from known_hosts
+fdc_px8r is passphrase-protected. r.pxj offers that key and fails closed
+until it is loaded in the agent. After it was loaded, ssh r.pxj is root.
+
+Boot result, by name:
+  hostname pxj
+  eno2 is UP, and vmbr0 plus vmbr4000 through vmbr4003 are UP
+  vmbr1 holds 2a01:4f8:2190:1993::2/64
+  vmbr4000 holds 10.10.0.18/24
+  rpool ONLINE, data ONLINE
+  ssh pxj is user todd, uid 947
+Local unbound had cached NXDOMAIN for pxj.fdh.bz while the authoritative
+server already had the AAAA. After unbound was restarted the name resolved.
