@@ -1,0 +1,6 @@
+=== uuid 2026-11-23T18:17:49Z ===
+2:-volume_date uuid '2026052111373600'
+uuid=2026052111373600
+=== inject ===
+52:set default="Install Proxmox VE (Terminal UI, Serial Console)"
+-rw-r--r-- 1 root root 1.6G Nov 23 19:17 /root/proxmox-ve_9.2-1-serial.iso

@@ -1,0 +1,42 @@
+pxj rescue kvm, 2026-11-23
+
+Host 2a01:4f8:2190:1993::2 (Robot 3119434), rescue, hostname rescue.
+Started with setsid --fork. No qemu process was running before this.
+Process still alive at elapsed 04:07 when last checked.
+
+pid 5360
+/usr/bin/kvm -smp 2 -usb -device usb-tablet -no-fd-bootchk \
+  -drive file=/dev/nvme0n1,index=0,media=disk,format=raw \
+  -drive file=/dev/nvme1n1,index=1,media=disk,format=raw \
+  -drive file=/root/proxmox-ve_9.2-1-serial.iso,index=2,media=cdrom,format=raw \
+  -boot once=d,order=c,menu=on -m 2048 \
+  -serial tcp:127.0.0.1:2111,server=on,wait=off \
+  -monitor tcp:127.0.0.1:1111,server=on,wait=off \
+  -nographic \
+  -net nic -net user,hostfwd=tcp::2022-:22,hostfwd=tcp::3022-:2022,hostfwd=tcp::8006-:8006
+
+Listen:
+  127.0.0.1:2111  kvm pid 5360
+  127.0.0.1:1111  kvm pid 5360
+stdout/stderr: /root/pxj-kvm.log (0 bytes; qemu stayed quiet)
+
+QEMU monitor info block:
+  ide0-hd0  /dev/nvme0n1
+  ide0-hd1  /dev/nvme1n1
+  ide1-cd0  /root/proxmox-ve_9.2-1-serial.iso read-only
+No HDD is attached. VM status: running.
+
+/root/pxj-kvm.log is empty. VGA screendump /root/pxj-screen.ppm is a black
+1024x768 frame. The installer UI is on the serial port, not VGA.
+
+nc is /usr/bin/nc (traditional netcat 1.10). socat is not installed.
+One TCP client owns port 2111. Disconnect before someone else connects.
+
+Attach from this workstation:
+  ssh -i /home/todd/.ssh/fdc_px2r.pub -o IdentitiesOnly=yes root@2a01:4f8:2190:1993::2
+  nc 127.0.0.1 2111
+
+The boot log was read once, then the socket was closed. A second read got
+0 bytes: the menu paint already went out while nobody was connected.
+If the terminal is blank, press an arrow key once so the UI redraws.
+Do not press Enter until the text is visible.

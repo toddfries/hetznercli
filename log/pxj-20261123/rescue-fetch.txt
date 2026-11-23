@@ -1,0 +1,7 @@
+The fetch script exec-redirects to /root/pxj-setup.log, so this file was empty
+until these lines were copied back.
+
+xorriso 1.5.6-1.2+b1 installed from Debian trixie.
+wget https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso
+2026-11-23 19:15:35 (89.0 MB/s) - saved [1706178560/1706178560]
+sha256sum -c: proxmox-ve_9.2-1.iso: OK

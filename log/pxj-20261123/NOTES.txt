@@ -1,0 +1,65 @@
+pxj first install slice, 2026-11-23. Local record. Not a procedure for the next host by itself.
+
+What this slice did
+- Posted Robot server 3119434 onto the five vSwitches copied from 2424209.
+  Live recheck: GET shows 3119434 on each posted vSwitch. See vswitch.txt.
+- fdc hosts commit d4735f3 (repo /home/todd/fdc/sites, not pushed) added
+  10.10.0.18 pxj and 2a01:4f8:2190:1993::2 pxj.fdh.bz. Other dirty files
+  in that tree were left uncommitted.
+- Rescue downloaded proxmox-ve_9.2-1.iso (1706178560 bytes, 2026-05-21).
+  sha256 4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c
+  matched SHA256SUMS. AAAA used for that fetch: 2a0b:7140:8:100::90.
+- Serial menu ISO is /root/proxmox-ve_9.2-1-serial.iso. kvm pid 5360 is
+  running it against nvme0n1 and nvme1n1 only. See kvm.txt and serial-boot.txt.
+
+Installer answers already chosen
+- Country United States, timezone America/Chicago, keyboard U.S. English.
+- Mail root@fdh.bz.
+- Filesystem ZFS RAID1 on the two NVMe only. hdsize 512G.
+  The tail of each NVMe stays empty for a later mirrored special vdev.
+- HDDs are not attached to this kvm. The 14-wide raidz2 pool is a later step.
+- Guest network will be qemu 10.0.2.15. Leave it. Bridges and the public
+  v6 are written after the metal boots from the NVMe.
+- ssh port 2022 and the ed25519 key are after that boot, not in this guest.
+
+Do not reboot the metal. Do not call Robot rescue, reset, or boot.
+A reboot offered by the installer reboots the guest inside kvm.
+
+ISO inject that worked
+Stock proxmox-ve 9.2 grub already has a serial menu entry, but it is
+hidden unless grub can probe a serial port. Rescue kvm has no VGA
+(-nographic, no -vnc), so the probe does not run and that entry never
+shows. The injected grub.cfg forces the serial terminal and defaults
+to "Install Proxmox VE (Terminal UI, Serial Console)" with timeout 10.
+See grub-stock.cfg and grub-serial.cfg.
+
+xorriso -boot_image any replay failed on this ISO (xorriso 1.5.6):
+  GPT partitions 1 and 2 overlap by 80 blocks
+  xorriso SORRY 32
+That is the isohybrid layout. Log: xorriso.txt. Do not retry replay.
+
+What worked, from the Proxmox auto-install note (keep the volume uuid
+so the boot image still finds its partition):
+  xorriso -dev ISO -report_system_area cmd
+  uuid 2026052111373600
+  cp ISO ISO-serial
+  xorriso --boot_image any keep -volume_date uuid 2026052111373600 \
+    -dev ISO-serial -map grub-serial.cfg /boot/grub/grub.cfg
+Log: xorriso-keep.txt. Re-extracted cfg contains the set default= line.
+
+Hetznercli::Iso::xorriso_argv still emits the replay command. It was
+not changed in this slice. hinstall --yes-download and --yes-kvm still
+refuse; the rescue steps were an ssh session.
+
+vSwitch code
+List GET /vswitch rows omit the server array. A missing array is not
+empty membership. hydrate_rows() in hinstall GETs /vswitch/{id} before
+the delta and again after POST. That recheck is what printed
+"GET shows 3119434 on each posted vSwitch".
+
+Not this slice
+Phase 2: stop kvm, boot the metal off the NVMe, ssh on port 2022 with
+the key, write bridges, carve the NVMe tails, zpool the HDDs from by-id.
+Phase 3 howto-setup stays parked.
+hcli still calls Server->ip and the old get(); documented, not fixed.
+Neither repo was pushed.

@@ -1,0 +1,21 @@
+First serial read, 35426 bytes, then the socket was closed.
+Second read 6s later: 0 bytes. Installer had already taken the console.
+
+Lines that show the serial Terminal UI path (kernel noise omitted):
+
+searching for block device containing the ISO proxmox-ve-9.2-1
+with ISO ID '019e4a4f-460a-76ae-9662-b996097dce93'
+testing device '/dev/sr0' for ISO
+found Proxmox VE ISO
+switching root from initrd to actual installation system
+Starting Proxmox installation
+Installing additional hardware drivers
+Setting terminal size to 80x24 for serial install
+Attempting to get DHCP leases...
+
+setfont failed six times (kdfontop, no usable font on this serial console).
+The installer continued past that.
+
+DHCP is qemu user-net. The management page will offer 10.0.2.15.
+howto-install uses that address and rewrites /etc/network/interfaces
+after the metal is on its own disks. Do not type the public v6 here.

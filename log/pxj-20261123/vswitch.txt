@@ -1,0 +1,23 @@
+public v6: 2a01:4f8:2190:1993::2
+reference v6: 2a01:4f8:13b:1995::2
+ISO choices, newest first:
+  proxmox-ve_9.2-1.iso 4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c recommended
+  proxmox-ve_9.1-1.iso 6d8f5afc78c0c66812d7272cde7c8b98be7eb54401ceb045400db05eb5ae6d22
+  proxmox-ve_8.4-1.iso d237d70ca48a9f6eb47f95fd4fd337722c3f69f8106393844d027d28c26523d8
+  proxmox-ve_7.4-1.iso 55b672c4b0d2bdcbff9910eea43df3b269aaab3f23e7a1df18b82d92eb995916
+ISO url: https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso
+AAAA: 2a0b:7140:8:100::90
+vSwitch delta, reference 2424209, target 3119434:
+  9352 vlan 4000 Internal storage
+  14083 vlan 4001 Public distribution
+  16051 vlan 4002 ellanet internal
+  27671 vlan 4003 fdh internal
+  29960 vlan 4004 fdh cloud internal
+posted 9352
+posted 14083
+posted 16051
+posted 27671
+posted 29960
+GET shows 3119434 on each posted vSwitch
+not downloading
+not starting kvm
