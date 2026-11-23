@@ -72,6 +72,7 @@ like($need_tails->{error}, qr/two tail/, 'special mirror without tails is refuse
 my $check = Hetznercli::Layout::checklist($pxj);
 like($check, qr/hdsize: 512G/, 'checklist names hdsize');
 like($check, qr/special_small_blocks stays unset/, 'checklist leaves small blocks unset');
+like($check, qr/Set reverse DNS on the host v6/, 'checklist sets reverse DNS');
 
 my @kvm = Hetznercli::Kvm::argv(
 	disks => $pxj->{install_disks},

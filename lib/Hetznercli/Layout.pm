@@ -158,6 +158,7 @@ sub checklist {
 		push @lines, 'That leaves the tail of each install disk unpartitioned';
 	}
 	push @lines, 'Disks that are not install disks stay out of the guest';
+	push @lines, 'Set reverse DNS on the host v6 to the host name';
 	if ($planned->{special}) {
 		push @lines, 'After boot, cut one GPT partition from each free tail';
 		push @lines, "The data pool is $planned->{level} plus a mirror of the two tails";

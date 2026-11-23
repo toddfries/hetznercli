@@ -1,0 +1,41 @@
+Reverse DNS for the account hosts, 2026-11-23.
+
+The host address is the Robot server_ipv6_net with interface id ::2.
+The PTR name is the Robot server_name. POST /rdns/{ip} with ptr=
+creates or updates. GET /rdns/{ip} reads it back.
+
+Already stored, left unchanged
+  px9.fdh.bz  2a01:4f8:140:34e8::2
+  pxe.fdh.bz  2a01:4f8:202:42f4::2
+  pxf.fdh.bz  2a01:4f8:10a:2986::2
+  pxh.fdh.bz  2a01:4f8:10b:2ecc::2
+Each of those names also has a matching AAAA.
+
+Set this run
+  pxi.fdh.bz  2a01:4f8:13b:1995::2
+    before: RDNS_NOT_FOUND at 2026-11-23 20:47:38 UTC
+    set:    2026-11-23 20:47:38 UTC
+    readback: ptr pxi.fdh.bz at 2026-11-23 20:47:42 UTC
+  pxj.fdh.bz  2a01:4f8:2190:1993::2
+    before: RDNS_NOT_FOUND at 2026-11-23 20:47:43 UTC
+    set:    2026-11-23 20:47:43 UTC
+    readback: ptr pxj.fdh.bz at 2026-11-23 20:47:47 UTC
+
+Forward DNS
+px9, pxe, pxf, pxh, and pxi already publish the same AAAA.
+pxj.fdh.bz is NXDOMAIN. The zone line for a human to paste is
+  pxj.fdh.bz. IN AAAA 2a01:4f8:2190:1993::2
+
+The install checklist now includes setting reverse DNS on the host v6.
+Other PTR records on the same subnets were not changed.
+
+Authoritative servers for 2a01:4f8::/32, queried with dig +norecurse
+and five seconds between queries:
+  ns1.your-server.de
+  ns.second-ns.com
+  ns3.second-ns.de
+Each answered AA.
+  pxi.fdh.bz  20:48:39, 20:48:44, 20:48:49 UTC
+    61s, 66s, and 71s after the 20:47:38 set
+  pxj.fdh.bz  20:48:54, 20:48:59, 20:49:04 UTC
+    71s, 76s, and 81s after the 20:47:43 set
