@@ -1,0 +1,38 @@
+# hetznercli crib
+sourced 20261123
+
+## Project facts
+
+- Repo: /home/todd/git/sw/hetznercli. Push target: git@github.com:toddfries/hetznercli.git (origin). Branch master.
+- Test command: `make regress` (prove regress/*.t).
+- License header: ISC, same block as hcli. New files use the current year only.
+- future-todo.md holds work that is blocked or not started.
+- Credentials live in $HOME/.hcli.conf (huser, hpass). Do not read that file into notes or commits.
+- Auction cache: data/N.json.xz, written by update_data from
+  https://www.hetzner.com/_resources/app/jsondata/live_data_sb.json
+  gitignored. getjson uses the highest consecutive index and stops at the first gap.
+
+## What runs without extra modules
+
+- hmarket, hmktst, hmktvm, hmktvm-picky, update_data.
+- Installed: ReadConf, JSON, JSON::PP, LWP::Simple, Date::Manip, URI::Escape, URI::Encode, Moose, MooseX::Params::Validate, Test::More.
+- xz and xzcat are installed. IO::Uncompress::UnXz is not. hmarket shells out to xzcat.
+
+## Not installed (ask; do not cpan)
+
+- WWW::Hetzner. Source: /home/todd/git/sw/p5-WWW-Hetzner. hcli will not compile without it.
+- WWW::req. Source: /home/todd/git/sw/p5-WWW-req. WWW::Hetzner extends it.
+- Hetzner::Robot. Source: /home/todd/git/sw/hetzner-robot-perl. grok-market requires it and also calls server_market_search, which that module does not define.
+
+## API shape
+
+- hcli talks to the Robot webservice at https://robot-ws.your-server.de/ through WWW::Hetzner. Personalities are read-only: ip, servers, reset, subnet, rdns, sshkey, products, storagebox, server_transactions, market_transactions, traffic, market_search.
+- hmarket does not call that API. It filters the public server-auction JSON. Default path keeps is_ecc and lines matching /Enterprise HDD/.
+- Hetzner publishes no Robot or Cloud sandbox. Do not point regress at the live account.
+
+## Regress coverage (20261123)
+
+- recurse_dump sort and addvar query joining, taken from hcli source.
+- hmarket disk GB/TB sums, price per TB, reload/fixed/countdown, -e -s -p -m -c, -o fixed/id/jsonfile, getjson gap vs consecutive index, missing-file death.
+- One id filter against the newest local snapshot.
+- sh -n on the shell wrappers. perl -c records the two missing modules instead of failing the suite for their absence.

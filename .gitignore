@@ -1,0 +1,6 @@
+# auction snapshots fetched by update_data
+data/
+*.log
+out0
+out1
+:wq
