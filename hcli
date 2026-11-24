@@ -25,6 +25,7 @@ use lib "$FindBin::Bin/lib";
 
 use Hetznercli::Addr;
 use Hetznercli::Ask;
+use Hetznercli::Bring;
 use Hetznercli::Fail;
 use Hetznercli::Market;
 use Hetznercli::Subnet;
@@ -50,14 +51,16 @@ our $opt_O; # market_search, sort order
 our $opt_f; # traffic from, YYYY-MM or YYYY-MM-DD
 our $opt_t; # traffic to, YYYY-MM or YYYY-MM-DD
 our $opt_i; # server number, product id, or address
-our $opt_n; # ptr name
+our $opt_n; # ptr name, or bring_online host
+our $opt_g; # bring_online pci path
+our $opt_w; # bring_online nic name
 our $opt_r; # reference server number
 our $opt_k; # stored ssh key fingerprint
 our $opt_T; # market_order rehearsal (test=true)
 our $argc = 0;
 
 
-getopts('c:p:vC:D:M:O:X:f:t:i:n:r:k:T');
+getopts('c:p:vC:D:M:O:X:f:t:i:n:r:k:g:w:T');
 
 my $conf = $opt_c;
 
@@ -514,13 +517,155 @@ if($opt_p eq "vswitch_copy") {
 	exit(0);
 }
 
+if ($opt_p eq "bring_online") {
+	my $hash_path = ($ENV{HETZNER_USER_CONF} || ($ENV{HOME} . "/.config/hetzner/todd.conf"));
+	my $plan = Hetznercli::Bring::plan(
+		name => $opt_n,
+		pci => $opt_g,
+		nic => $opt_w,
+		hash_status => Hetznercli::Bring::hash_status($hash_path),
+	);
+	if ($plan->{error}) {
+		print "$plan->{error}\n";
+		exit(1);
+	}
+	print $plan->{text};
+	if ($plan->{finished}) {
+		exit(0);
+	}
+	if (bring_gate("Append the SSH HostKeyAlias block for $plan->{fqdn} to ~/.ssh/config?\n\nyes to append, no to skip, z to explain in the chat.\n")) {
+		my $cfg = $ENV{HOME} . "/.ssh/config";
+		my $status = bring_ssh($cfg, $plan->{name});
+		print "ssh config: $status\n";
+		exit(1) if $status =~ /^error/;
+	}
+	if (defined($opt_g) && defined($opt_w)) {
+		if (bring_gate("The NIC files are above. Copy them into the rescue image before the first disk boot.\n\nyes to continue, no to skip, z to explain in the chat.\n")) {
+			print "NIC files are above. Copy them into the rescue image before the first disk boot.\n";
+		}
+	}
+	if (bring_gate("Create user todd on r.$plan->{name} from ~/.config/hetzner/todd.conf?\n\nyes to run it, no to skip, z to explain in the chat.\n")) {
+		exit(1) if bring_todd($plan->{name}, $hash_path);
+	}
+	if (bring_gate("Order the Let's Encrypt certificate for $plan->{fqdn} on port 8006?\n\nyes to run it, no to skip, z to explain in the chat.\n")) {
+		exit(1) if bring_acme($plan->{name});
+	}
+	exit(0);
+}
+
 my $p = $opt_p;
 if (!defined($p)) {
 	$p = "<undef>";
 }
 printf "personality '%s' not found\n", $p;
-print "personalities: ip servers reset subnet rdns rdns_set sshkey products storagebox server_transactions market_transactions traffic market market_search market_show market_order vswitch_copy\n";
+print "personalities: ip servers reset subnet rdns rdns_set sshkey products storagebox server_transactions market_transactions traffic market market_search market_show market_order vswitch_copy bring_online\n";
 exit(1);
+
+sub bring_gate {
+	my ($prompt) = @_;
+	my $ans = Hetznercli::Ask::choose($prompt, [["no", "n"], ["yes", "y"], ["z", "z"]], "no");
+	if (!defined($ans) || $ans eq "n" || $ans eq "") {
+		print "skipped\n";
+		return 0;
+	}
+	if ($ans eq "z") {
+		print "other: explain in the chat\n";
+		exit(0);
+	}
+	if ($ans ne "y") {
+		print "skipped\n";
+		return 0;
+	}
+	return 1;
+}
+
+sub bring_ssh {
+	my ($path, $name) = @_;
+	open my $fh, "<", $path or return "error open $path: $!";
+	local $/;
+	my $text = <$fh>;
+	close $fh;
+	$text = "" if !defined($text);
+	my $merged = Hetznercli::Bring::merge_ssh($text, $name);
+	return "error $merged->{error}" if $merged->{error};
+	return "present" if $merged->{status} eq "present";
+	open my $out, ">>", $path or return "error append $path: $!";
+	print {$out} "\n" . Hetznercli::Bring::ssh_block($name);
+	close $out or return "error append $path: $!";
+	return "appended";
+}
+
+sub bring_hash {
+	my ($path) = @_;
+	return undef if Hetznercli::Bring::hash_status($path) ne "ok";
+	open my $fh, "<", $path or return undef;
+	while (my $line = <$fh>) {
+		next if $line !~ /^[[:space:]]*hash[[:space:]]*=[[:space:]]*(.*)$/;
+		my $hash = $1;
+		$hash =~ s/[[:space:]]+\z//;
+		close $fh;
+		return $hash;
+	}
+	close $fh;
+	return undef;
+}
+
+sub bring_todd {
+	my ($name, $path) = @_;
+	my $pubpath = $ENV{HOME} . "/.ssh/mykeypxu.pub";
+	open my $pf, "<", $pubpath or do {
+		print "missing $pubpath\n";
+		return 1;
+	};
+	my $pub = <$pf>;
+	close $pf;
+	$pub =~ s/\s+\z// if defined($pub);
+	my $remote = Hetznercli::Bring::todd_remote($pub);
+	if ($remote eq "") {
+		print "todd key was refused\n";
+		return 1;
+	}
+	my $hash = bring_hash($path);
+	if (!defined($hash)) {
+		print "hash file: " . Hetznercli::Bring::hash_status($path) . "\n";
+		return 1;
+	}
+	my $pid = open my $ssh, "|-", "ssh", "-o", "BatchMode=yes",
+		"-o", "ClearAllForwardings=yes", "r.$name", "bash", "-c", $remote;
+	if (!$pid) {
+		print "ssh r.$name failed to start\n";
+		return 1;
+	}
+	print {$ssh} $hash, "\n";
+	close $ssh;
+	if ($? != 0) {
+		print "todd setup failed\n";
+		return 1;
+	}
+	return 0;
+}
+
+sub bring_acme {
+	my ($name) = @_;
+	my $script = Hetznercli::Bring::acme_script($name);
+	if ($script eq "") {
+		print "certificate script was refused\n";
+		return 1;
+	}
+	my $pid = open my $ssh, "|-", "ssh", "-o", "BatchMode=yes",
+		"-o", "ClearAllForwardings=yes", "r.$name", "bash", "-s";
+	if (!$pid) {
+		print "ssh r.$name failed to start\n";
+		return 1;
+	}
+	print {$ssh} $script;
+	close $ssh;
+	if ($? != 0) {
+		print "certificate order failed\n";
+		return 1;
+	}
+	return 0;
+}
 
 sub api_exit {
 	my ($parsed, $empty) = @_;
