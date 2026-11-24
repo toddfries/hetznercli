@@ -1,0 +1,192 @@
+.\"
+.\" Copyright (c) 2026 Todd T. Fries <todd@fries.net>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 23, 2026
+.Dt HINSTALL 1
+.Os
+.Sh NAME
+.Nm hinstall
+.Nd print a Proxmox install plan for a Hetzner server
+.Sh SYNOPSIS
+.Nm hinstall
+.Fl -offline
+.Fl -sums Ar file
+.Fl -inventory Ar file
+.Fl -spec Ar file
+.Nm hinstall
+.Fl -server Ar number
+.Fl -reference Ar number
+.Op Fl -vswitch-file Ar file
+.Op Fl -yes-vswitch
+.Nm hinstall
+.Op Fl -hosts Ar file
+.Op Fl -interfaces Ar file
+.Op Fl -nic Ar name
+.Op Fl -public-v6 Ar address
+.Op Fl -lan Ar address
+.Sh DESCRIPTION
+.Nm
+prints the pieces of a Proxmox install and does not start the installer.
+The only Robot write is
+.Fl -yes-vswitch ,
+and only for vSwitches that the reference server has and the target lacks.
+.Fl -offline
+refuses that flag.
+.Pp
+.Fl -yes-download
+and
+.Fl -yes-kvm
+do not download an ISO and do not start kvm.
+Either flag makes
+.Nm
+exit with an error.
+The message says that step runs on the rescue host after a
+yes on the printed line.
+.Pp
+Without
+.Fl -offline ,
+.Fl -server
+reads
+.Pa ~/.hcli.conf
+and prints the host address, the
+.Ql ::2
+address inside
+.Va server_ipv6_net .
+.Fl -reference
+also prints that server's
+.Ql ::2
+address when Robot has one.
+.Pp
+ISO lines come from
+.Fl -sums
+or, unless
+.Fl -offline
+is set, from
+.Lk https://enterprise.proxmox.com/iso/SHA256SUMS .
+The newest non-ARM Proxmox VE image is marked recommended.
+A live sums file also triggers an AAAA lookup of
+.Pa enterprise.proxmox.com .
+If that lookup shows no address,
+.Nm
+prints that the ISO should not be downloaded yet.
+.Pp
+With
+.Fl -reference
+and
+.Fl -server ,
+membership is loaded from
+.Fl -vswitch-file
+or from Robot.
+A vSwitch whose member list is missing is fetched by id.
+Unknown membership is an error.
+The delta is printed.
+Without
+.Fl -yes-vswitch
+the last line of that section is
+.Dq not posting vSwitch membership .
+.Pp
+.Fl -hosts
+prints the next free LAN address from that hosts file and does not ping it.
+The rendered interface draft needs
+.Fl -interfaces ,
+.Fl -nic ,
+a public v6 address, and a LAN address.
+The draft is printed.
+The host interfaces file is not written.
+.Pp
+.Fl -inventory
+and
+.Fl -spec
+together print the install checklist, the
+.Xr qemu 1
+argument list for the NVMe install disks, and the later
+.Ql zpool
+command when the plan has a special vdev.
+Nothing in that section is executed.
+.Sh OPTIONS
+.Bl -tag -width "Fl -vswitch-file Ar file"
+.It Fl -offline
+Do not call Robot, do not fetch the sums file, and do not post.
+.It Fl -server Ar number
+Robot server number of the machine being installed.
+.It Fl -reference Ar number
+Robot server number whose vSwitch membership is the template.
+.It Fl -inventory Ar file
+JSON disk inventory.
+.It Fl -spec Ar file
+JSON layout spec.
+.It Fl -interfaces Ar file
+Host interfaces file to render from.
+The output is a draft.
+.It Fl -nic Ar name
+Physical interface name used in that draft.
+.It Fl -public-v6 Ar address
+Public host address used in that draft.
+Overrides the address read from Robot.
+.It Fl -lan Ar address
+LAN address used in that draft.
+Overrides the candidate from
+.Fl -hosts .
+.It Fl -sums Ar file
+Proxmox
+.Pa SHA256SUMS
+text, or an HTML index.
+.It Fl -vswitch-file Ar file
+JSON vSwitch list to use instead of a live Robot read.
+.It Fl -hosts Ar file
+Hosts file scanned for a free LAN address.
+.It Fl -yes-vswitch
+Attach the target to each missing vSwitch.
+.Ql VSWITCH_IN_PROCESS
+is retried three times, five seconds apart.
+A later read must show the target on each posted vSwitch.
+.It Fl -yes-download
+Refused.
+Does not download.
+.It Fl -yes-kvm
+Refused.
+Does not start the virtual machine.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa ~/.hcli.conf
+Robot user and password, read when
+.Fl -server
+is set and
+.Fl -offline
+is not.
+.El
+.Sh EXIT STATUS
+.Ex -std hinstall
+A refused write, a bad argument, or a failed Robot read exits non-zero.
+A plan that only prints exits 0, including the line that
+says vSwitch membership was not posted.
+.Sh EXAMPLES
+Offline plan from fixtures:
+.Bd -literal -offset indent
+hinstall --offline \\
+    --sums regress/fixtures/sha256sums \\
+    --inventory regress/fixtures/pxj-inventory.json \\
+    --spec regress/fixtures/pxj-spec.json
+.Ed
+.Pp
+Show the vSwitch delta and do not post:
+.Pp
+.Dl hinstall --server 1 --reference 2
+.Sh SEE ALSO
+.Xr hcli 1 ,
+.Xr qemu 1
+.Sh AUTHORS
+.An Todd T. Fries Aq Mt todd@fries.net

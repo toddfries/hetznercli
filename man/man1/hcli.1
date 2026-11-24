@@ -1,0 +1,475 @@
+.\"
+.\" Copyright (c) 2026 Todd T. Fries <todd@fries.net>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 23, 2026
+.Dt HCLI 1
+.Os
+.Sh NAME
+.Nm hcli
+.Nd Hetzner Robot account and server-auction client
+.Sh SYNOPSIS
+.Nm hcli
+.Fl p Ar personality
+.Op Fl c Ar file
+.Nm hcli
+.Fl p Cm market
+.Op Fl O Ar order
+.Nm hcli
+.Fl p Cm market_search
+.Op Fl C Ar bench
+.Op Fl D Ar gigabytes
+.Op Fl M Ar gigabytes
+.Op Fl O Ar order
+.Op Fl X Ar text
+.Nm hcli
+.Fl p Cm market_show
+.Fl i Ar product-id
+.Nm hcli
+.Fl p Cm market_order
+.Fl i Ar product-id
+.Op Fl k Ar fingerprint
+.Op Fl T
+.Nm hcli
+.Fl p Cm traffic
+.Op Fl f Ar from
+.Op Fl t Ar to
+.Op Fl i Ar server-number
+.Nm hcli
+.Fl p Cm rdns_set
+.Fl i Ar address
+.Fl n Ar ptr
+.Nm hcli
+.Fl p Cm vswitch_copy
+.Fl r Ar reference
+.Fl i Ar target
+.Nm hcli
+.Fl p Cm bring_online
+.Fl n Ar name
+.Op Fl g Ar pci
+.Op Fl w Ar nic
+.Sh DESCRIPTION
+.Nm
+talks to the Hetzner Robot web service.
+The usual invocation is
+.Pa ~/bin/hcli ,
+which adds the
+.Pa p5-WWW-req
+and
+.Pa p5-WWW-Hetzner
+library trees and then runs this program.
+.Pp
+.Fl p
+selects the personality.
+An unknown name prints the list and exits 1.
+Reads print and exit.
+A write asks in
+.Xr xmessage 1
+first.
+The default button is
+.Cm no .
+There is no timer.
+If
+.Ev DISPLAY
+is empty it is set to
+.Cm :0 .
+Enter selects the default button.
+.Cm z
+prints
+.Dq other: explain in the chat
+and exits 0.
+A failed
+.Xr xmessage 1
+is treated as no.
+.Pp
+The auction table is not printed while the download arrives.
+.Fl p Cm market
+and
+.Fl p Cm market_search
+download the whole product list, drop rows when that
+personality filters, measure the columns from the rows
+that remain, and then print the table.
+The next run measures again.
+Text columns start under the header.
+Number columns end on the header.
+.Pp
+.Bl -tag -width "EUR/TB" -compact
+.It DC
+Datacenter, with
+.Ql -DC
+shortened to
+.Ql - .
+.It prodid
+Auction product id.
+.It sys
+Product name.
+.It bench
+CPU benchmark.
+.It disk
+Disk count times disk size, in gigabytes.
+.It MEM
+RAM in gigabytes.
+.It EUR
+Monthly price, two digits after the decimal.
+.It EUR/TB
+Monthly price per tebibyte, five digits after the decimal.
+A tebibyte is the disk gigabytes divided by 1024.
+A row with no disk prints
+.Ql - .
+.It next
+Local
+.Ql mmdd HH:MM
+when the price next drops.
+.It TB
+Traffic, with a trailing
+.Ql " TB"
+removed.
+.It CPU info
+CPU description, unpadded.
+.El
+.Sh OPTIONS
+.Bl -tag -width "Fl k Ar fingerprint"
+.It Fl c Ar file
+ReadConf file.
+The default is
+.Pa ~/.hcli.conf .
+The keys are
+.Va huser
+and
+.Va hpass .
+.It Fl C Ar bench
+.Cm market_search
+floor for the CPU benchmark.
+The default is 5682.
+Ignored by
+.Cm market .
+.It Fl D Ar gigabytes
+.Cm market_search
+floor for count times size.
+The default is 4096.
+Ignored by
+.Cm market .
+.It Fl f Ar from
+First month of a
+.Cm traffic
+window.
+Use with
+.Fl t .
+.Cm YYYY-MM
+or
+.Cm YYYY-MM-DD .
+A day is reduced to its month.
+.It Fl g Ar pci
+PCI path for the
+.Cm bring_online
+NIC pin.
+.Ql 0000:bb:dd.f
+or the same string with a
+.Ql pci-
+prefix.
+.It Fl i Ar id
+Meaning depends on the personality:
+server number for
+.Cm traffic ,
+auction product id for
+.Cm market_show
+and
+.Cm market_order ,
+address for
+.Cm rdns_set ,
+and target server number for
+.Cm vswitch_copy .
+.It Fl k Ar fingerprint
+Stored Robot SSH key for
+.Cm market_order .
+Skips the key picker.
+The confirm dialog still runs.
+.It Fl M Ar gigabytes
+.Cm market_search
+floor for RAM.
+The default is 48.
+Ignored by
+.Cm market .
+.It Fl n Ar name
+PTR name for
+.Cm rdns_set ,
+or the short host name for
+.Cm bring_online .
+.It Fl O Ar order
+Sort the auction table.
+.Cm mem
+sorts by RAM.
+.Cm price
+sorts by monthly price.
+Any other word prints an error and the table stays in download order.
+Honored by
+.Cm market
+and
+.Cm market_search .
+.It Fl p Ar personality
+Which Robot call to make.
+Required.
+.It Fl r Ar server
+Reference server number for
+.Cm vswitch_copy .
+.It Fl t Ar to
+Last month of a
+.Cm traffic
+window.
+Use with
+.Fl f .
+Same date forms as
+.Fl f .
+.It Fl T
+Add
+.Ql test=true
+to a
+.Cm market_order
+post.
+Robot accepts it and does not provision the server.
+The confirm dialog still runs.
+.It Fl v
+Accepted and ignored.
+.It Fl w Ar nic
+Interface name for the
+.Cm bring_online
+NIC pin, such as
+.Ql eno2 .
+.It Fl X Ar text
+Sent as
+.Ql search=
+on a
+.Cm market_search
+download.
+The default is
+.Cm Ent .
+Robot ignores this parameter, and it is not applied to CPU or disk text.
+.El
+.Sh PERSONALITIES
+.Bl -tag -width "market_transactions"
+.It Cm ip
+Dump the account IP list.
+.It Cm servers
+One block per server: number, name, paid-until date, the
+.Ql ::2
+address from
+.Va server_ipv6_net ,
+the gateway from the subnet list, an IPv4 address when
+.Va server_ip
+is a dotted quad, and the PTR of that
+.Ql ::2
+address.
+.It Cm reset
+List server number, server IP, and the reset types Robot offers.
+This does not reboot a server.
+A server with no IPv4 can make the IP column warn.
+.It Cm subnet
+Dump the subnet list.
+.It Cm rdns
+Dump every reverse-DNS record on the account.
+.It Cm rdns_set
+Print the current PTR of
+.Fl i ,
+then ask before posting
+.Fl n .
+The default button is
+.Cm no .
+.It Cm sshkey
+Dump the SSH keys stored in Robot.
+.It Cm products
+Dump the full-price dedicated catalog,
+.Ql GET /order/server/product .
+This is not the server auction.
+.It Cm storagebox
+Dump the storage-box list.
+.It Cm server_transactions
+Dump dedicated-server orders.
+An empty list prints
+.Dq no server transactions
+and exits 0.
+A missing document exits 2.
+.It Cm market_transactions
+Dump auction orders.
+An empty list prints
+.Dq no market transactions
+and exits 0.
+A missing document exits 2.
+.It Cm traffic
+Monthly totals for the last six calendar months,
+including the current month, unless
+.Fl f
+and
+.Fl t
+both set another window.
+One end alone is an error.
+The post uses each server's IPv6 prefix and any real IPv4 address.
+.Fl i
+keeps one server number.
+Gigabytes in, out, and sum are printed per address.
+A prefix with no samples prints
+.Dq no samples .
+A month that has not closed can come back as zero.
+.It Cm market
+Download every current auction server and print the table described above.
+Robot ignores query filters on this call, so none are sent.
+The last line is
+.Ql auction servers: N .
+.It Cm market_search
+Same download and same table as
+.Cm market ,
+then drop rows under the
+.Fl C ,
+.Fl D ,
+and
+.Fl M
+floors.
+The count line is omitted.
+.It Cm market_show
+Print one auction server: id, name, datacenter, CPU and
+benchmark, RAM, disks, description, monthly, hourly, and
+setup price, price per tebibyte to two decimals, traffic,
+the next drop, and the network speed.
+Requires
+.Fl i .
+.It Cm market_order
+Print the same stats as
+.Cm market_show ,
+then ask which stored Robot key to install.
+An ED25519 key is the recommended default.
+.Fl k
+selects a key without that dialog.
+A second dialog, default
+.Cm no ,
+shows the post body.
+The post is IPv6-only:
+.Va product_id
+and
+.Va authorized_key[] ,
+plus
+.Va test
+when
+.Fl T
+is set.
+No password, no comment, and no
+.Va primary_ipv4
+addon.
+A comment would make Robot process the order by hand.
+Ordering must be enabled on the account.
+The account allows about 20 order calls a day.
+The reply's server number stays empty until the machine is provisioned.
+.It Cm vswitch_copy
+Print the vSwitches present on
+.Fl r
+and absent from
+.Fl i .
+A list row with no server array is fetched again.
+Unknown membership is an error, not an empty attachment list.
+The default button is
+.Cm no .
+On yes, each missing vSwitch is attached.
+.Ql VSWITCH_IN_PROCESS
+is retried three times, five seconds apart.
+A later read must show the target on each posted vSwitch.
+.It Cm bring_online
+Print the SSH
+.Va HostKeyAlias
+block, the NIC pin, the todd user step, and the port 8006 certificate step for
+.Fl n Ns \&.fdh.bz .
+The name is lowercased and a trailing
+.Ql .fdh.bz
+is removed.
+.Cm pxj
+prints the plan and does not ask, ssh, or append.
+Any other name asks before each of the four steps.
+The default button is
+.Cm no .
+The SSH block sets aliases only.
+It does not copy local forwards.
+The NIC files are printed when both
+.Fl g
+and
+.Fl w
+are set.
+Saying yes prints them again and does not copy them.
+They have to be on the rescue image before the first disk boot.
+The todd step reads
+.Ev HETZNER_USER_CONF
+or
+.Pa ~/.config/hetzner/todd.conf ,
+refuses to print the hash, and runs
+.Ql ssh r. Ns Ar name .
+The certificate step is the Proxmox ACME order for that host name.
+The contact is
+.Mt postmaster@fdh.bz .
+A certificate that is already issued is left in place.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa ~/.hcli.conf
+Robot user and password.
+Mode 600.
+.It Pa ~/bin/hcli
+Wrapper that supplies the Perl library path.
+.It Pa ~/.config/hetzner/todd.conf
+Hash file for
+.Cm bring_online .
+One ReadConf line,
+.Va hash ,
+holding a
+.Ql $2a$ ,
+.Ql $2b$ ,
+or
+.Ql $2y$
+hash.
+The hash is not printed.
+.It Pa ~/.ssh/config
+Appended only after a yes on
+.Cm bring_online .
+.El
+.Sh EXIT STATUS
+.Ex -std hcli
+A Robot 404 or
+.Ql NOT_FOUND
+document prints one line and exits 2.
+Other Robot errors print
+.Ql api
+and the status, code, and message, and exit 1.
+Declining a write, or choosing
+.Cm z ,
+exits 0.
+.Sh EXAMPLES
+Auction table, columns fitted to this download:
+.Pp
+.Dl ~/bin/hcli -p market
+.Pp
+One auction server:
+.Pp
+.Dl ~/bin/hcli -p market_show -i 2799696
+.Pp
+Six months of traffic for every server:
+.Pp
+.Dl ~/bin/hcli -p traffic
+.Pp
+Plan for a new host, without running the steps:
+.Pp
+.Dl ~/bin/hcli -p bring_online -n pxk
+.Sh SEE ALSO
+.Xr hinstall 1 ,
+.Xr hmarket 1 ,
+.Xr hmktst 1 ,
+.Xr hmktvm 1 ,
+.Xr update_data 1 ,
+.Xr xmessage 1
+.Sh AUTHORS
+.An Todd T. Fries Aq Mt todd@fries.net

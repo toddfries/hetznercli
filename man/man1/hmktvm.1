@@ -1,0 +1,73 @@
+.\"
+.\" Copyright (c) 2026 Todd T. Fries <todd@fries.net>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 23, 2026
+.Dt HMKTVM 1
+.Os
+.Sh NAME
+.Nm hmktvm
+.Nd run the hmarket searches used for a virtual-machine host
+.Sh SYNOPSIS
+.Nm hmktvm
+.Op Ar hmarket-flags ...
+.Sh DESCRIPTION
+.Nm
+is a
+.Xr sh 1
+wrapper.
+Run it from the repository directory.
+It calls
+.Pa ./hmarket
+three times and prints a label before each table.
+Extra arguments are appended to every call.
+.Pp
+The three searches, in order:
+.Bl -tag -width "2disk 8gb storage <=$72 >=128G ram" -compact
+.It 2disk 8gb storage <=$50 >=64G ram
+.Fl c Cm 2
+.Fl s Cm 8000
+.Fl p Cm 50
+.Fl m Cm 64
+.It 2disk 4gb storage <=$40 >=64G ram
+.Fl c Cm 2
+.Fl s Cm 4000
+.Fl p Cm 40
+.Fl m Cm 64
+.It 2disk 8gb storage <=$72 >=128G ram
+.Fl c Cm 2
+.Fl s Cm 8000
+.Fl p Cm 72
+.Fl m Cm 128
+.El
+.Pp
+The labels say dollars.
+The
+.Fl p
+value is the auction price in euros.
+.Fl s
+is gigabytes, with a snapshot
+.Ql TB
+multiplied by 1000, so 8000 is 8 TB in that unit.
+ECC and Enterprise HDD stay on.
+.Sh EXIT STATUS
+The exit status is the status of the last
+.Xr hmarket 1
+call.
+.Sh SEE ALSO
+.Xr hmarket 1 ,
+.Xr hmktst 1 ,
+.Xr hmktvm-picky 1
+.Sh AUTHORS
+.An Todd T. Fries Aq Mt todd@fries.net

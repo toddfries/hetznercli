@@ -5,4 +5,8 @@
 regress:
 	prove regress/*.t
 
-.PHONY: regress
+manlint:
+	MANPATH=${.CURDIR}/man:/usr/share/man:/usr/X11R6/man:/usr/local/man \
+	    mandoc -Tlint -Wstyle ${.CURDIR}/man/man1/*.1
+
+.PHONY: regress manlint

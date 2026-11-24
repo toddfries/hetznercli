@@ -1,0 +1,152 @@
+.\"
+.\" Copyright (c) 2026 Todd T. Fries <todd@fries.net>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 23, 2026
+.Dt HMARKET 1
+.Os
+.Sh NAME
+.Nm hmarket
+.Nd filter a saved Hetzner server-auction snapshot
+.Sh SYNOPSIS
+.Nm hmarket
+.Op Fl v
+.Op Fl c Ar disks
+.Op Fl e Ar 0|1
+.Op Fl m Ar gigabytes
+.Op Fl p Ar euros
+.Op Fl s Ar gigabytes
+.Op Fl D Ar ids
+.Op Fl o Ar key=value Ns Op \&; Ns Ar key=value ...
+.Sh DESCRIPTION
+.Nm
+reads one local
+.Pa data/N.json.xz
+snapshot of the public server-auction feed and prints
+the servers that pass the filters.
+It does not call Robot and it does not download the feed.
+.Xr update_data 1
+stores the next snapshot.
+.Pp
+Run it from the repository directory so
+.Pa data/
+resolves, or pass
+.Fl o Cm jsonfile= Ns Ar path .
+The file used is the highest
+.Pa data/N.json.xz
+whose index is still consecutive from 0.
+The first missing index stops the search.
+.Pp
+Two filters are always on unless noted.
+The disk text must contain
+.Ql Enterprise HDD .
+ECC is required unless
+.Fl e Cm 0
+is set.
+.Pp
+Price per TB in this table is the auction price divided
+by the disk total in decimal terabytes
+.Pq gigabytes divided by 1000 ,
+printed with three digits after the decimal.
+.Xr hcli 1
+.Fl p Cm market
+uses tebibytes
+.Pq divided by 1024
+and five digits, and it reads Robot rather than these snapshots.
+.Pp
+The columns are server id, RAM in gigabytes, total disk
+gigabytes, disk count, price, price per TB, and the time
+until the next price drop.
+A past stamp on a server whose price is still moving prints
+.Ql reload .
+A past stamp on a fixed-price server prints
+.Ql fixed .
+.Sh OPTIONS
+.Bl -tag -width "Fl o Ar key=value"
+.It Fl c Ar disks
+Keep servers with at least this many parsed disks.
+.It Fl e Ar 0|1
+ECC floor.
+The default is 1, which drops non-ECC servers.
+.Cm 0
+keeps non-ECC servers as well.
+.It Fl m Ar gigabytes
+Keep servers with at least this much RAM.
+.It Fl p Ar euros
+Keep servers whose auction price is at most this many euros.
+.It Fl s Ar gigabytes
+Keep servers whose parsed disk total is at least this many gigabytes.
+A
+.Ql TB
+size in the snapshot is multiplied by 1000.
+A
+.Ql GB
+size is used as printed.
+A disk line that matches neither form is printed with
+.Ql !match
+and is not counted.
+.It Fl v
+Print the datacenter, CPU, RAM description, and NIC lines
+under each kept server.
+Also print which snapshot was opened.
+With
+.Fl D ,
+or with
+.Fl o Cm id= ,
+dump those server records.
+.It Fl D Ar ids
+Comma-separated server ids to dump when
+.Fl v
+is set.
+.It Fl o Ar key=value
+Semicolon-separated options.
+.Bl -tag -width "jsonfile" -compact
+.It Cm jsonfile
+Read this snapshot instead of
+.Pa data/N.json.xz .
+.It Cm fixed
+.Cm fixed=1
+keeps only servers whose auction price has stopped falling.
+.It Cm id
+Comma-separated server ids.
+Other servers are skipped.
+.El
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa data/N.json.xz
+Consecutive auction snapshots, starting at
+.Pa data/0.json.xz .
+The files are gitignored.
+.El
+.Sh EXIT STATUS
+.Ex -std hmarket
+A missing snapshot exits non-zero and the message names
+the path.
+.Sh EXAMPLES
+ECC Enterprise servers in the newest consecutive snapshot:
+.Pp
+.Dl ./hmarket
+.Pp
+One saved file, two ids:
+.Pp
+.Dl ./hmarket -o id=1001,1005;jsonfile=data/0.json.xz
+.Sh SEE ALSO
+.Xr hcli 1 ,
+.Xr hmktst 1 ,
+.Xr hmktvm 1 ,
+.Xr hmktvm-picky 1 ,
+.Xr update_data 1
+.Sh AUTHORS
+.An Todd T. Fries Aq Mt todd@fries.net
