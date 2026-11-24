@@ -8,15 +8,12 @@ sourced 20261123
 - License header: ISC, same block as hcli. New files use the current year only.
 - future-todo.md holds work that is blocked or not started.
 - Credentials live in $HOME/.hcli.conf (huser, hpass). Do not read that file into notes or commits.
-- Auction cache: data/N.json.xz, written by update_data from
-  https://www.hetzner.com/_resources/app/jsondata/live_data_sb.json
-  gitignored. getjson uses the highest consecutive index and stops at the first gap.
+- data/N.json.xz snapshots are gitignored leftovers. Nothing in this repo downloads them. hcli -p market reads Robot, not those files.
 
 ## What runs without extra modules
 
-- hmarket, hmktst, hmktvm, hmktvm-picky, update_data.
+- hmktst, hmktvm, and hmktvm-picky call ~/bin/hcli -p market. hinstall stays separate. hmarket and update_data are retired.
 - Installed: ReadConf, JSON, JSON::PP, LWP::Simple, Date::Manip, URI::Escape, URI::Encode, Moose, MooseX::Params::Validate, Test::More.
-- xz and xzcat are installed. IO::Uncompress::UnXz is not. hmarket shells out to xzcat.
 
 ## Not installed (ask; do not cpan)
 
@@ -27,7 +24,7 @@ sourced 20261123
 ## API shape
 
 - hcli talks to the Robot webservice at https://robot-ws.your-server.de/ through WWW::Hetzner. Personalities are read-only: ip, servers, reset, subnet, rdns, sshkey, products, storagebox, server_transactions, market_transactions, traffic, market_search.
-- hmarket does not call that API. It filters the public server-auction JSON. Default path keeps is_ecc and lines matching /Enterprise HDD/.
+- hcli -p market and -p market_search take repeatable -o key=value. format=full is the wide table. format=price is the fixed price table. format=custom is refused. disk, disk.count, and price bounds are inclusive. Each -o re must match.
 - Hetzner publishes no Robot or Cloud sandbox. Do not point regress at the live account.
 
 ## Live call notes (20261123, via ~/bin/hcli for 12h)
@@ -49,6 +46,6 @@ p5-WWW-Hetzner 17c1a7c (2024-05-22) renamed API get/set to vget/vset and removed
 ## Regress coverage (20261123)
 
 - recurse_dump sort and addvar query joining, taken from hcli source.
-- hmarket disk GB/TB sums, price per TB, reload/fixed/countdown, -e -s -p -m -c, -o fixed/id/jsonfile, getjson gap vs consecutive index, missing-file death.
+- Market floors, format=price, and the hmkt* wrappers calling hcli are in regress/market.t.
 - One id filter against the newest local snapshot.
 - sh -n on the shell wrappers. perl -c records the two missing modules instead of failing the suite for their absence.

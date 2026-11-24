@@ -13,47 +13,49 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 23, 2026
+.Dd November 24, 2026
 .Dt HMKTVM-PICKY 1
 .Os
 .Sh NAME
 .Nm hmktvm-picky
-.Nd one tighter hmarket search for a virtual-machine host
+.Nd one tighter auction search for a virtual-machine host
 .Sh SYNOPSIS
 .Nm hmktvm-picky
-.Op Ar hmarket-flags ...
+.Op Ar hcli-flags ...
 .Sh DESCRIPTION
 .Nm
 is a
 .Xr sh 1
 wrapper.
-Run it from the repository directory.
 It prints one label and calls
-.Pa ./hmarket
-once.
+.Pa ~/bin/hcli
+once with
+.Fl p Cm market .
+.Ev HCLI
+overrides that path.
 Extra arguments are appended.
 .Pp
 The search is
-.Fl c Cm 2
-.Fl s Cm 8000
-.Fl p Cm 35
-.Fl m Cm 64 ,
-labeled
+.Fl M Cm 64 ,
+.Fl o Cm disk.count.min=2 ,
+.Fl o Cm disk.min=8000 ,
+.Fl o Cm price.max=35 ,
+.Fl o Cm format=price ,
+.Fl o Cm re=ECC ,
+and
+.Fl o Cm re=ENT .
+The label is
 .Dq 2disk 8gb storage <=$35 >=64G ram .
 The label says dollars.
-.Fl p
-is the auction price in euros.
-8000 gigabytes is 8 TB after
-.Xr hmarket 1
-multiplies a snapshot
-.Ql TB
-by 1000.
-ECC and Enterprise HDD stay on.
+.Cm price.max
+is the monthly price in euros.
+8000 is total gigabytes.
+Both patterns must match.
 .Sh EXIT STATUS
 The exit status is the status of
-.Xr hmarket 1 .
+.Xr hcli 1 .
 .Sh SEE ALSO
-.Xr hmarket 1 ,
+.Xr hcli 1 ,
 .Xr hmktvm 1
 .Sh AUTHORS
 .An Todd T. Fries Aq Mt todd@fries.net

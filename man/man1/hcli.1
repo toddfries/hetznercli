@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 23, 2026
+.Dd November 24, 2026
 .Dt HCLI 1
 .Os
 .Sh NAME
@@ -25,7 +25,11 @@
 .Op Fl c Ar file
 .Nm hcli
 .Fl p Cm market
+.Op Fl C Ar bench
+.Op Fl D Ar gigabytes
+.Op Fl M Ar gigabytes
 .Op Fl O Ar order
+.Op Fl o Ar key=value
 .Nm hcli
 .Fl p Cm market_search
 .Op Fl C Ar bench
@@ -33,6 +37,7 @@
 .Op Fl M Ar gigabytes
 .Op Fl O Ar order
 .Op Fl X Ar text
+.Op Fl o Ar key=value
 .Nm hcli
 .Fl p Cm market_show
 .Fl i Ar product-id
@@ -93,15 +98,16 @@ A failed
 .Xr xmessage 1
 is treated as no.
 .Pp
-The auction table is not printed while the download arrives.
+The auction list is not printed while the download arrives.
 .Fl p Cm market
 and
 .Fl p Cm market_search
-download the whole product list, drop rows when that
-personality filters, measure the columns from the rows
-that remain, and then print the table.
+download the whole product list, drop rows that miss a
+set floor, and then print.
+The default format measures each column from the rows
+that remain.
 The next run measures again.
-Text columns start under the header.
+In that table, text columns start under the header.
 Number columns end on the header.
 .Pp
 .Bl -tag -width "EUR/TB" -compact
@@ -138,6 +144,16 @@ removed.
 .It CPU info
 CPU description, unpadded.
 .El
+.Pp
+.Fl o Cm format=price
+prints fixed columns instead of the table above:
+server id, RAM, total disk gigabytes, disk count, the
+monthly price, euros per decimal terabyte to three places,
+and the time left until the next drop.
+That rate divides disk gigabytes by 1000.
+The wide table divides by 1024 and keeps five decimal places.
+The fixed columns can overflow.
+The wide columns grow to each download.
 .Sh OPTIONS
 .Bl -tag -width "Fl k Ar fingerprint"
 .It Fl c Ar file
@@ -149,17 +165,26 @@ The keys are
 and
 .Va hpass .
 .It Fl C Ar bench
+CPU benchmark floor for
+.Cm market
+and
+.Cm market_search .
 .Cm market_search
-floor for the CPU benchmark.
-The default is 5682.
-Ignored by
-.Cm market .
+defaults to 5682.
+.Cm market
+applies it only when the flag is set.
 .It Fl D Ar gigabytes
+Disk floor, count times size, for
+.Cm market
+and
+.Cm market_search .
 .Cm market_search
-floor for count times size.
-The default is 4096.
-Ignored by
-.Cm market .
+defaults to 4096.
+.Cm market
+applies it only when the flag is set.
+.Pp
+A higher value raises
+.Cm disk.min .
 .It Fl f Ar from
 First month of a
 .Cm traffic
@@ -196,16 +221,114 @@ Stored Robot SSH key for
 Skips the key picker.
 The confirm dialog still runs.
 .It Fl M Ar gigabytes
+RAM floor, in gigabytes, for
+.Cm market
+and
+.Cm market_search .
 .Cm market_search
-floor for RAM.
-The default is 48.
-Ignored by
-.Cm market .
+defaults to 48.
+.Cm market
+applies it only when the flag is set.
 .It Fl n Ar name
 PTR name for
 .Cm rdns_set ,
 or the short host name for
 .Cm bring_online .
+.It Fl o Ar key=value
+Repeatable auction option.
+Only
+.Cm market
+and
+.Cm market_search
+accept it.
+Anywhere else it prints
+.Ql -o is only for market and market_search
+and exits 1.
+A bare
+.Fl o
+prints
+.Ql -o needs key=value
+and exits 1.
+.Bl -tag -width "disk.count=min:max" -compact
+.It Cm format=full
+The wide table above.
+This is the default.
+.Cm market
+appends
+.Ql auction servers: N .
+.Cm market_search
+omits that line.
+.It Cm format=price
+Fixed columns: id, RAM, disk gigabytes, disk count,
+monthly price, euros per decimal terabyte to three places,
+and the time until the next drop.
+A future drop prints days and
+.Ql HH:MM:SS ,
+then
+.Ql aka
+and the local
+.Ql YYYYMMDD HH:MM:SS .
+A non-positive
+.Va next_reduce
+prints
+.Cm fixed
+when
+.Va fixed_price
+is true, otherwise
+.Cm reload .
+This format omits the server count.
+.It Cm format=custom:...
+Recognized and refused with
+.Ql format=custom is not implemented .
+.It Cm disk.min Ns = Ns Ar n
+.It Cm disk.max Ns = Ns Ar n
+.It Cm disk Ns = Ns Ar min:max
+Total disk gigabytes, count times size, inclusive.
+A later minimum only rises.
+A later maximum only falls.
+.It Cm disk.count.min Ns = Ns Ar n
+.It Cm disk.count.max Ns = Ns Ar n
+.It Cm disk.count Ns = Ns Ar min:max
+Disk count, inclusive.
+The same later-bound rule applies.
+.It Cm price.min Ns = Ns Ar eur
+.It Cm price.max Ns = Ns Ar eur
+.It Cm price Ns = Ns Ar min:max
+Monthly price in euros, inclusive.
+.It Cm re Ns = Ns Ar pattern
+A Perl regular expression.
+Every
+.Cm re
+must match.
+One pattern may use
+.Ql |
+as or.
+The searched text is the disk line, the CPU line, and the
+description.
+.El
+An unknown key prints
+.Ql unknown option
+and the key.
+An unknown format prints
+.Ql unknown format
+and the value.
+A bad number prints the key and
+.Ql needs a number .
+A bad range prints the key and
+.Ql needs MIN:MAX .
+An empty pattern prints
+.Ql re needs a pattern .
+A pattern that does not compile prints
+.Ql bad re .
+A minimum above its maximum is an error.
+.Fl D
+raises the disk minimum when
+.Fl D
+is higher.
+A smaller
+.Cm disk.min
+does not lower
+.Fl D .
 .It Fl O Ar order
 Sort the auction table.
 .Cm mem
@@ -321,20 +444,37 @@ A prefix with no samples prints
 .Dq no samples .
 A month that has not closed can come back as zero.
 .It Cm market
-Download every current auction server and print the table described above.
+Download every current auction server.
 Robot ignores query filters on this call, so none are sent.
-The last line is
+Rows must pass any
+.Fl C ,
+.Fl D ,
+.Fl M ,
+or
+.Fl o
+bound that was set.
+There is no default floor.
+The default print is the wide table.
+Its last line is
 .Ql auction servers: N .
+.Fl o Cm format=price
+prints the fixed price table and omits that line.
 .It Cm market_search
-Same download and same table as
-.Cm market ,
-then drop rows under the
+Same download as
+.Cm market .
+Rows under the
 .Fl C ,
 .Fl D ,
 and
 .Fl M
-floors.
+floors are dropped.
+Those floors default to 5682, 4096, and 48.
+.Fl o
+bounds apply as well.
 The count line is omitted.
+.Fl X
+is still sent on the download.
+It is not matched against CPU or disk text.
 .It Cm market_show
 Print one auction server: id, name, datacenter, CPU and
 benchmark, RAM, disks, description, monthly, hourly, and
@@ -453,6 +593,10 @@ Auction table, columns fitted to this download:
 .Pp
 .Dl ~/bin/hcli -p market
 .Pp
+Same list in the fixed price table, with both tags required:
+.Pp
+.Dl ~/bin/hcli -p market -o format=price -o re=ECC -o re=ENT
+.Pp
 One auction server:
 .Pp
 .Dl ~/bin/hcli -p market_show -i 2799696
@@ -466,10 +610,9 @@ Plan for a new host, without running the steps:
 .Dl ~/bin/hcli -p bring_online -n pxk
 .Sh SEE ALSO
 .Xr hinstall 1 ,
-.Xr hmarket 1 ,
 .Xr hmktst 1 ,
 .Xr hmktvm 1 ,
-.Xr update_data 1 ,
+.Xr hmktvm-picky 1 ,
 .Xr xmessage 1
 .Sh AUTHORS
 .An Todd T. Fries Aq Mt todd@fries.net

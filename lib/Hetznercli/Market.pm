@@ -26,15 +26,173 @@ sub _num {
 	return 0;
 }
 
+sub _hay {
+	my ($product) = @_;
+	my @part;
+	push @part, $product->{hdd_text} if defined($product->{hdd_text});
+	push @part, $product->{cpu} if defined($product->{cpu});
+	if (ref($product->{description}) eq 'ARRAY') {
+		push @part, @{ $product->{description} };
+	} elsif (defined($product->{description}) && !ref($product->{description})) {
+		push @part, $product->{description};
+	}
+	return join("\n", @part);
+}
+
+sub _truthy {
+	my ($v) = @_;
+	return 0 if !defined($v) || $v eq '' || $v eq '0' || $v eq 'false';
+	return $v ? 1 : 0;
+}
+
 sub keep {
 	my ($product, $min) = @_;
 	return 0 if ref($product) ne 'HASH';
 	return 1 if ref($min) ne 'HASH';
 	my $disk = _num($product->{hdd_count}) * _num($product->{hdd_size});
+	my $count = _num($product->{hdd_count});
+	my $price = _num($product->{price});
 	return 0 if defined($min->{cpu}) && _num($product->{cpu_benchmark}) < $min->{cpu};
 	return 0 if defined($min->{mem}) && _num($product->{memory_size}) < $min->{mem};
 	return 0 if defined($min->{disk}) && $disk < $min->{disk};
+	return 0 if defined($min->{disk_max}) && $disk > $min->{disk_max};
+	return 0 if defined($min->{count_min}) && $count < $min->{count_min};
+	return 0 if defined($min->{count_max}) && $count > $min->{count_max};
+	return 0 if defined($min->{price_min}) && $price < $min->{price_min};
+	return 0 if defined($min->{price_max}) && $price > $min->{price_max};
+	if (ref($min->{re}) eq 'ARRAY') {
+		my $hay = _hay($product);
+		foreach my $re (@{ $min->{re} }) {
+			return 0 if $hay !~ $re;
+		}
+	}
 	return 1;
+}
+
+sub _num_ok {
+	my ($v) = @_;
+	return defined($v) && $v =~ /\A\d+(?:\.\d+)?\z/;
+}
+
+sub _raise_min {
+	my ($out, $key, $v) = @_;
+	$out->{$key} = $v + 0 if !defined($out->{$key}) || $v + 0 > $out->{$key};
+}
+
+sub _lower_max {
+	my ($out, $key, $v) = @_;
+	$out->{$key} = $v + 0 if !defined($out->{$key}) || $v + 0 < $out->{$key};
+}
+
+sub _range {
+	my ($val) = @_;
+	return if !defined($val) || $val !~ /\A(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)\z/;
+	return ($1 + 0, $2 + 0);
+}
+
+# Repeated -o key=value. A later minimum only rises. A later maximum only falls.
+# format=custom is recognized and refused.
+sub parse_opts {
+	my (@spec) = @_;
+	my $out = {
+		format => 'full',
+		re => [],
+	};
+	foreach my $one (@spec) {
+		if (!defined($one) || $one !~ /\A([^=]+)=(.*)\z/s) {
+			return { error => 'option needs key=value' };
+		}
+		my ($key, $val) = ($1, $2);
+		if ($key eq 'format') {
+			if ($val eq 'full' || $val eq 'price') {
+				$out->{format} = $val;
+				next;
+			}
+			if ($val =~ /\Acustom:/) {
+				return { error => 'format=custom is not implemented' };
+			}
+			return { error => "unknown format $val" };
+		}
+		if ($key eq 're') {
+			if ($val eq '') {
+				return { error => 're needs a pattern' };
+			}
+			my $re = eval { qr/$val/ };
+			if ($@ || !defined($re)) {
+				return { error => 'bad re' };
+			}
+			push @{ $out->{re} }, $re;
+			next;
+		}
+		if ($key eq 'disk.min' || $key eq 'disk.max' || $key eq 'disk'
+			|| $key eq 'price.min' || $key eq 'price.max' || $key eq 'price'
+			|| $key eq 'disk.count.min' || $key eq 'disk.count.max'
+			|| $key eq 'disk.count') {
+			my ($min, $max);
+			if ($key =~ /\.min\z/) {
+				return { error => "$key needs a number" } if !_num_ok($val);
+				$min = $val + 0;
+			} elsif ($key =~ /\.max\z/) {
+				return { error => "$key needs a number" } if !_num_ok($val);
+				$max = $val + 0;
+			} else {
+				($min, $max) = _range($val);
+				return { error => "$key needs MIN:MAX" } if !defined($min);
+			}
+			my ($minkey, $maxkey) = ($key =~ /\Adisk\.count/)
+				? ('count_min', 'count_max')
+				: ($key =~ /\Aprice/)
+				? ('price_min', 'price_max')
+				: ('disk_min', 'disk_max');
+			_raise_min($out, $minkey, $min) if defined($min);
+			_lower_max($out, $maxkey, $max) if defined($max);
+			next;
+		}
+		return { error => "unknown option $key" };
+	}
+	if (defined($out->{disk_min}) && defined($out->{disk_max})
+		&& $out->{disk_min} > $out->{disk_max}) {
+		return { error => 'disk min is above disk max' };
+	}
+	if (defined($out->{count_min}) && defined($out->{count_max})
+		&& $out->{count_min} > $out->{count_max}) {
+		return { error => 'disk count min is above disk count max' };
+	}
+	if (defined($out->{price_min}) && defined($out->{price_max})
+		&& $out->{price_min} > $out->{price_max}) {
+		return { error => 'price min is above price max' };
+	}
+	return $out;
+}
+
+# -D raises disk.min. The other CLI floors are copied when set.
+sub merge_cli {
+	my ($opts, $cli) = @_;
+	return { error => 'missing options' } if ref($opts) ne 'HASH';
+	return { error => $opts->{error} } if $opts->{error};
+	$cli = {} if ref($cli) ne 'HASH';
+	my $disk = $opts->{disk_min};
+	if (defined($cli->{disk}) && $cli->{disk} ne '') {
+		my $n = _num($cli->{disk});
+		$disk = $n if !defined($disk) || $n > $disk;
+	}
+	if (defined($disk) && defined($opts->{disk_max}) && $disk > $opts->{disk_max}) {
+		return { error => 'disk min is above disk max' };
+	}
+	return {
+		format => $opts->{format},
+		keep => {
+			cpu => (defined($cli->{cpu}) && $cli->{cpu} ne '') ? $cli->{cpu} : undef,
+			mem => (defined($cli->{mem}) && $cli->{mem} ne '') ? $cli->{mem} : undef,
+			disk => $disk,
+			disk_max => $opts->{disk_max},
+			count_min => $opts->{count_min},
+			count_max => $opts->{count_max},
+			price_min => $opts->{price_min},
+			price_max => $opts->{price_max},
+			re => $opts->{re},
+		},
+	};
 }
 
 # Padded columns, then the CPU text. Left-aligned fields start under their
@@ -106,6 +264,53 @@ sub format_row {
 	return '' if !@fields;
 	my @w = _widths(\@fields);
 	return _format_line(\@fields, \@w);
+}
+
+# Same two-line banner and fixed row as hmarket. GB is count times size.
+# The rate divides by 1000, not 1024, and keeps three decimals.
+sub format_price {
+	my ($products, $now) = @_;
+	$products = [] if ref($products) ne 'ARRAY';
+	$now = time() if !defined($now);
+	my $text = "\n"
+		. "                  HDD HDD        Price\n"
+		. "           Ram   Size  Ct          Per  ,--Next Adjust-------------------.\n"
+		. " ServerID   GB     GB     Price     TB Day HH:MM:SS     Date     Time\n";
+	foreach my $product (@{ $products }) {
+		next if ref($product) ne 'HASH';
+		my $count = _num($product->{hdd_count});
+		my $gb = $count * _num($product->{hdd_size});
+		my $price = defined($product->{price}) ? $product->{price} : '';
+		my $rate = ($gb > 0) ? (_num($price) / ($gb / 1000)) : 0;
+		my $next = $product->{next_reduce};
+		my $when = '      reload';
+		my $aka = '';
+		if (defined($next) && $next =~ /\A-?\d+\z/) {
+			my $sec = $next + 0;
+			if ($sec > 0) {
+				my $d = int($sec / 86400);
+				my $h = int(($sec % 86400) / 3600);
+				my $m = int(($sec % 3600) / 60);
+				my $s = $sec % 60;
+				$when = sprintf('%2dd %2d:%02d:%02d', $d, $h, $m, $s);
+			} elsif (_truthy($product->{fixed_price})) {
+				$when = '       fixed';
+			}
+			$aka = strftime('%Y%m%d %H:%M:%S', localtime($now + $sec));
+		} elsif (_truthy($product->{fixed_price})) {
+			$when = '       fixed';
+		}
+		my $tail = ($aka ne '') ? "$when aka $aka" : $when;
+		$text .= sprintf("%9d %4d %6d %2d %6s %6.3f %s\n",
+			_num($product->{id}),
+			_num($product->{memory_size}),
+			$gb,
+			$count,
+			$price,
+			$rate,
+			$tail);
+	}
+	return $text;
 }
 
 # Header plus one line per product. Both market listings use this.

@@ -1,0 +1,7 @@
+#!/bin/sh
+hcli=${HCLI:-$HOME/bin/hcli}
+
+echo "2disk 8gb storage <=\$35 >=64G ram"
+$hcli -p market -M 64 -o format=price \
+	-o disk.count.min=2 -o disk.min=8000 -o price.max=35 \
+	-o re=ECC -o re=ENT "$@"

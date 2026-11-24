@@ -13,61 +13,66 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 23, 2026
+.Dd November 24, 2026
 .Dt HMKTST 1
 .Os
 .Sh NAME
 .Nm hmktst
-.Nd run the usual hmarket storage and disk-count searches
+.Nd run the usual storage and disk-count auction searches
 .Sh SYNOPSIS
 .Nm hmktst
-.Op Ar hmarket-flags ...
+.Op Ar hcli-flags ...
 .Sh DESCRIPTION
 .Nm
 is a
 .Xr sh 1
 wrapper.
-Run it from the repository directory.
 It calls
-.Pa ./hmarket
-five times and prints a label before each table.
-Extra arguments are appended to every call, which is how a snapshot is selected:
+.Pa ~/bin/hcli
+five times with
+.Fl p Cm market
+and prints a label before each table.
+.Ev HCLI
+overrides that path.
+Extra arguments are appended to every call.
+Each call downloads the auction again.
 .Pp
-.Dl ./hmktst -o jsonfile=data/27.json.xz
+Each search passes
+.Fl o Cm format=price ,
+.Fl o Cm re=ECC ,
+and
+.Fl o Cm re=ENT .
+Both patterns must match.
+A row needs ECC and ENT in the disk, CPU, or description text.
 .Pp
 The five searches, in order:
 .Bl -tag -width "Storage min 40g price max 100" -compact
 .It Storage min 40g price max 100
-.Fl s Cm 40000
-.Fl p Cm 100
+.Fl o Cm disk.min=40000
+.Fl o Cm price.max=100
 .It Storage min 27g price max 80
-.Fl s Cm 27000
-.Fl p Cm 80
+.Fl o Cm disk.min=27000
+.Fl o Cm price.max=80
 .It Disk count min 5 price max 80
-.Fl c Cm 5
-.Fl p Cm 80
+.Fl o Cm disk.count.min=5
+.Fl o Cm price.max=80
 .It Lotta disk cheap
-.Fl s Cm 80000
+.Fl o Cm disk.min=80000
 .It Lucky draw: 7 disk min
-.Fl c Cm 7
+.Fl o Cm disk.count.min=7
 .El
 .Pp
-.Fl s
-is gigabytes after
-.Xr hmarket 1
-parses the snapshot.
-A 40 TB disk is 40000 in that unit because a
-.Ql TB
-size is multiplied by 1000.
-ECC and Enterprise HDD stay on, since this wrapper does not pass
-.Fl e .
+.Cm disk.min
+is total gigabytes, count times size.
+40000 is 40 TB in the old decimal unit.
+The prices in the labels are euros.
 .Sh EXIT STATUS
 The exit status is the status of the last
-.Xr hmarket 1
+.Xr hcli 1
 call.
 .Sh SEE ALSO
-.Xr hmarket 1 ,
+.Xr hcli 1 ,
 .Xr hmktvm 1 ,
-.Xr update_data 1
+.Xr hmktvm-picky 1
 .Sh AUTHORS
 .An Todd T. Fries Aq Mt todd@fries.net

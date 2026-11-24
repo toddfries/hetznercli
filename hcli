@@ -59,8 +59,36 @@ our $opt_k; # stored ssh key fingerprint
 our $opt_T; # market_order rehearsal (test=true)
 our $argc = 0;
 
+# Getopt::Std keeps one -o. Lift every -o before it runs.
+my @market_o;
+{
+	my @rest;
+	while (@ARGV) {
+		my $arg = shift @ARGV;
+		if ($arg eq '-o') {
+			if (!@ARGV) {
+				print "-o needs key=value\n";
+				exit(1);
+			}
+			push @market_o, shift @ARGV;
+			next;
+		}
+		if ($arg =~ /\A-o(.+)\z/) {
+			push @market_o, $1;
+			next;
+		}
+		push @rest, $arg;
+	}
+	@ARGV = @rest;
+}
 
 getopts('c:p:vC:D:M:O:X:f:t:i:n:r:k:g:w:T');
+
+if (@market_o && (!defined($opt_p)
+	|| ($opt_p ne 'market' && $opt_p ne 'market_search'))) {
+	print "-o is only for market and market_search\n";
+	exit(1);
+}
 
 my $conf = $opt_c;
 
@@ -256,6 +284,14 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 			$opt_M = 48;
 		}
 	}
+	my $opts = Hetznercli::Market::parse_opts(@market_o);
+	my $merged = Hetznercli::Market::merge_cli($opts, {
+		cpu => $opt_C, mem => $opt_M, disk => $opt_D,
+	});
+	if ($merged->{error}) {
+		print "$merged->{error}\n";
+		exit(1);
+	}
 	my $call = "order/server_market/product";
 	if ($filtered) {
 		$argc = 0;
@@ -297,16 +333,16 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 		next if ref($server) ne "HASH";
 		my $product = $server->{product};
 		next if ref($product) ne "HASH";
-		if ($filtered) {
-			next if !Hetznercli::Market::keep($product, {
-				cpu => $opt_C, mem => $opt_M, disk => $opt_D,
-			});
-		}
+		next if !Hetznercli::Market::keep($product, $merged->{keep});
 		push @shown, $product;
 	}
-	print Hetznercli::Market::format_table(\@shown);
-	if (!$filtered) {
-		print "auction servers: " . scalar(@shown) . "\n";
+	if ($merged->{format} eq 'price') {
+		print Hetznercli::Market::format_price(\@shown);
+	} else {
+		print Hetznercli::Market::format_table(\@shown);
+		if (!$filtered) {
+			print "auction servers: " . scalar(@shown) . "\n";
+		}
 	}
 	exit(0);
 }

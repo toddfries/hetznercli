@@ -146,4 +146,83 @@ is(scalar @keys, 2, 'wrapped key rows unwrap');
 is(Hetznercli::Market::recommend_key(\@keys)->{fingerprint}, '2e:24',
 	'an ED25519 key is the recommendation');
 
+my $edge = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts(
+		'disk=100:200', 'price=10:40', 'disk.count=2:4'),
+	{});
+ok(!$edge->{error}, 'a range parses') or diag($edge->{error});
+my $bounds = $edge->{keep};
+my $keep100 = { price => 20, hdd_count => 2, hdd_size => 50,
+	hdd_text => 'ENT.HDD ECC INIC', cpu => 'x' };
+my $keep200 = { price => 20, hdd_count => 2, hdd_size => 100,
+	hdd_text => 'ENT.HDD ECC INIC', cpu => 'x' };
+ok(Hetznercli::Market::keep($keep100, $bounds), 'disk 100 is inside the range');
+ok(Hetznercli::Market::keep($keep200, $bounds), 'disk 200 is inside the range');
+ok(!Hetznercli::Market::keep({ %$keep100, hdd_size => 49 }, $bounds),
+	'disk 98 is below the range');
+ok(!Hetznercli::Market::keep({ %$keep100, hdd_size => 101 }, $bounds),
+	'disk 202 is above the range');
+ok(!Hetznercli::Market::keep({ %$keep100, hdd_count => 1, hdd_size => 100 }, $bounds),
+	'one disk is below the count range');
+
+my $tighter = Hetznercli::Market::parse_opts(
+	'disk.min=50', 'disk.min=80', 'disk.max=300', 'disk.max=250',
+	'price.max=40', 'price.max=15');
+is($tighter->{disk_min}, 80, 'a later disk minimum only rises');
+is($tighter->{disk_max}, 250, 'a later disk maximum only falls');
+is($tighter->{price_max}, 15, 'a later price maximum only falls');
+ok(Hetznercli::Market::parse_opts('disk=200:100')->{error},
+	'a backward disk range is refused');
+
+my $both = Hetznercli::Market::parse_opts('re=ECC', 're=ENT');
+ok(Hetznercli::Market::keep($p, $both), 'ECC and ENT both match the fixture');
+ok(!Hetznercli::Market::keep({ %$p, hdd_text => 'ECC desktop', description => [] }, $both),
+	'a second re drops a row that misses ENT');
+my $either = Hetznercli::Market::parse_opts('re=(ECC|ENT)');
+ok(Hetznercli::Market::keep({ %$p, hdd_text => 'desktop ECC', description => [] }, $either),
+	'one re with a bar keeps either tag');
+ok(Hetznercli::Market::parse_opts('re=(')->{error}, 'a broken re is refused');
+like(Hetznercli::Market::parse_opts('format=custom:%s')->{error},
+	qr/not implemented/, 'custom format is reserved');
+
+my $priced = Hetznercli::Market::format_price([$p], $now);
+like($priced, qr/ServerID\s+GB\s+GB\s+Price/, 'price format uses the hmarket header');
+like($priced, qr/\b282323\b/, 'price format prints the id');
+like($priced, qr/\b24\b/, 'price format prints the RAM');
+like($priced, qr/\b240\b/, 'price format prints the disk total');
+like($priced, qr/\b2\b/, 'price format prints the disk count');
+like($priced, qr/381\.667/, 'price format uses three decimal terabyte digits');
+my $aka = strftime('%Y%m%d %H:%M:%S', localtime($now + 3600));
+like($priced, qr/ 0d  1:00:00 aka \Q$aka\E/, 'price format counts down to the drop');
+my $fixed = Hetznercli::Market::format_price([{
+	%$p, next_reduce => 0, fixed_price => 1,
+}], $now);
+like($fixed, qr/fixed aka/, 'a stopped auction prints fixed');
+my $reload = Hetznercli::Market::format_price([{
+	%$p, next_reduce => 0, fixed_price => 0,
+}], $now);
+like($reload, qr/reload aka/, 'a past drop without a fixed price prints reload');
+
+my $merged = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('disk.min=1000', 'disk.max=5000'),
+	{ disk => 4096 });
+is($merged->{keep}{disk}, 4096, 'the CLI disk floor wins when it is higher');
+ok(Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('disk.max=1000'),
+	{ disk => 4096 })->{error},
+	'a CLI floor above disk.max is refused');
+
+my $preset = $ENV{HOME} . '/git/sw/hetznercli';
+foreach my $sh (qw(hmktst hmktvm hmktvm-picky)) {
+	open my $fh, '<', "$preset/$sh" or die "open $sh: $!";
+	local $/;
+	my $body = <$fh>;
+	close $fh;
+	unlike($body, qr/hmarket/, "$sh does not call hmarket");
+	like($body, qr/-p market\b/, "$sh calls hcli market");
+	like($body, qr/format=price/, "$sh asks for the price table");
+	like($body, qr/re=ECC/, "$sh requires ECC");
+	like($body, qr/re=ENT/, "$sh requires ENT");
+}
+
 done_testing();
