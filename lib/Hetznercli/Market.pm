@@ -37,10 +37,14 @@ sub keep {
 	return 1;
 }
 
-# Same columns as the long-standing market_search table.
-sub format_row {
+# Padded columns, then the CPU text. Left-aligned fields start under their
+# header. Right-aligned fields end on their header. Widths grow to the rows.
+my @COL_HEAD = qw(DC prodid sys bench disk MEM EUR EUR/TB next TB);
+my @COL_LEFT = (1, 0, 1, 0, 0, 0, 0, 0, 1, 1);
+
+sub row_fields {
 	my ($product, $now) = @_;
-	return '' if ref($product) ne 'HASH';
+	return () if ref($product) ne 'HASH';
 	$now = time() if !defined($now);
 	my $dc = defined($product->{datacenter}) ? $product->{datacenter} : '';
 	$dc =~ s/-DC/-/;
@@ -52,17 +56,73 @@ sub format_row {
 	if (defined($next) && $next =~ /\A-?\d+\z/) {
 		$nextr = strftime('%m%d %H:%M', localtime($now + $next));
 	}
-	return sprintf("%8s %7d %5s %5d %5d %3d %6.2f %10s %3s %s\n",
+	my $per = price_per_tb($product);
+	my $per_s = defined($per) ? sprintf('%.5f', $per) : '-';
+	return (
 		$dc,
-		_num($product->{id}),
+		sprintf('%d', _num($product->{id})),
 		(defined($product->{name}) ? $product->{name} : ''),
-		_num($product->{cpu_benchmark}),
-		$disk,
-		_num($product->{memory_size}),
-		_num($product->{price}),
+		sprintf('%d', _num($product->{cpu_benchmark})),
+		sprintf('%d', $disk),
+		sprintf('%d', _num($product->{memory_size})),
+		sprintf('%.2f', _num($product->{price})),
+		$per_s,
 		$nextr,
 		$traffic,
-		(defined($product->{cpu}) ? $product->{cpu} : ''));
+		(defined($product->{cpu}) ? $product->{cpu} : ''),
+	);
+}
+
+sub _widths {
+	my (@rows) = @_;
+	my @w = map { length($COL_HEAD[$_]) } 0 .. $#COL_HEAD;
+	foreach my $fields (@rows) {
+		for my $i (0 .. $#COL_HEAD) {
+			my $n = length($fields->[$i] // '');
+			$w[$i] = $n if $n > $w[$i];
+		}
+	}
+	return @w;
+}
+
+sub _format_line {
+	my ($fields, $widths) = @_;
+	my @out;
+	for my $i (0 .. $#$widths) {
+		my $v = defined($fields->[$i]) ? $fields->[$i] : '';
+		if ($COL_LEFT[$i]) {
+			push @out, sprintf('%-*s', $widths->[$i], $v);
+		} else {
+			push @out, sprintf('%*s', $widths->[$i], $v);
+		}
+	}
+	my $cpu = defined($fields->[$#$widths + 1]) ? $fields->[$#$widths + 1] : '';
+	return join(' ', @out, $cpu) . "\n";
+}
+
+sub format_row {
+	my ($product, $now) = @_;
+	my @fields = row_fields($product, $now);
+	return '' if !@fields;
+	my @w = _widths(\@fields);
+	return _format_line(\@fields, \@w);
+}
+
+# Header plus one line per product. Both market listings use this.
+sub format_table {
+	my ($products, $now) = @_;
+	$products = [] if ref($products) ne 'ARRAY';
+	my @rows;
+	foreach my $product (@{ $products }) {
+		my @fields = row_fields($product, $now);
+		push @rows, \@fields if @fields;
+	}
+	my @w = _widths(@rows);
+	my $text = _format_line([@COL_HEAD, 'CPU info'], \@w);
+	foreach my $fields (@rows) {
+		$text .= _format_line($fields, \@w);
+	}
+	return $text;
 }
 
 # EUR per tebibyte of the advertised disk total. hdd_size is gigabytes.

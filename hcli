@@ -292,9 +292,7 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 			print "market_search: unhandled sort type ${opt_O}\n";
 		}
 	}
-	printf "%8s %7s %5s %5s %5s %3s %6s %10s %3s %6s\n",
-		"DC","prodid","sys","bench","disk","MEM","EUR","next","TB","CPU info";
-	my $shown = 0;
+	my @shown;
 	foreach my $server (@res) {
 		next if ref($server) ne "HASH";
 		my $product = $server->{product};
@@ -304,11 +302,11 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 				cpu => $opt_C, mem => $opt_M, disk => $opt_D,
 			});
 		}
-		print Hetznercli::Market::format_row($product);
-		$shown++;
+		push @shown, $product;
 	}
+	print Hetznercli::Market::format_table(\@shown);
 	if (!$filtered) {
-		print "auction servers: $shown\n";
+		print "auction servers: " . scalar(@shown) . "\n";
 	}
 	exit(0);
 }

@@ -63,6 +63,48 @@ like($line, qr/FSN1-4/, 'datacenter column shortens DC');
 like($line, qr/\b282323\b/, 'product id');
 like($line, qr/\b240\b/, 'disk total is count times size');
 like($line, qr/\Q$nextr\E/, 'next reduce is local time from now');
+like($line, qr/390\.82667/, 'EUR/TB has five digits after the dot');
+
+my $wide = {
+	%{ $p },
+	id => 2799696,
+	name => 'Server Auction',
+	datacenter => 'FSN1-DC14',
+	cpu => 'Intel Xeon E5-1650 v3',
+	cpu_benchmark => 15463,
+	memory_size => 64,
+	hdd_size => 512,
+	hdd_count => 4,
+	price => '66.38',
+	traffic => 'unlimited',
+};
+my $table = Hetznercli::Market::format_table([$wide, $p], $now);
+my @rows = split /\n/, $table;
+my ($header, $first, $second) = @rows;
+is(index($header, 'DC'), index($first, 'FSN1-14'), 'DC header sits on the datacenter');
+is(index($header, 'sys'), index($first, 'Server Auction'), 'sys header sits on the name');
+is(index($header, 'next'), index($first, $nextr), 'next header sits on the drop time');
+is(rindex($header, 'TB'), index($first, 'unlimited'), 'TB header sits on the traffic');
+is(index($header, 'CPU info'), index($first, 'Intel Xeon E5-1650 v3'),
+	'CPU info header sits on the cpu');
+is(index($second, 'SB109'), index($header, 'sys'), 'a shorter name stays under sys');
+is(index($second, 'Intel Core i7 980x'), index($header, 'CPU info'),
+	'cpu text starts in the same column');
+
+sub _end {
+	my ($text, $token) = @_;
+	my $at = index($text, $token);
+	return -1 if $at < 0;
+	return $at + length($token);
+}
+is(_end($header, 'prodid'), _end($first, '2799696'), 'prodid header ends on the id');
+is(_end($header, 'bench'), _end($first, '15463'), 'bench header ends on the benchmark');
+is(_end($header, 'disk'), _end($first, '2048'), 'disk header ends on the disk total');
+is(_end($header, 'MEM'), _end($first, '64'), 'MEM header ends on the memory');
+is(_end($header, 'EUR'), _end($first, '66.38'), 'EUR header ends on the price');
+is(_end($header, 'EUR/TB'), _end($first, '33.19000'), 'EUR/TB header ends on the rate');
+is(_end($header, 'EUR/TB'), _end($second, '390.82667'),
+	'the second row rate ends on EUR/TB');
 
 my $per = Hetznercli::Market::price_per_tb($p);
 is(sprintf('%.2f', $per), '390.83', 'price per tebibyte of 240 GB');
