@@ -47,7 +47,7 @@ our $opt_C; # market_search, cpu bench min
 our $opt_D; # market_search, disk size min
 our $opt_M; # market_search, mem size min
 our $opt_X = "Ent"; # market_search, text search string
-our $opt_O; # market_search, sort order
+our $opt_O; # deprecated; same as -o sort= when that is absent
 our $opt_f; # traffic from, YYYY-MM or YYYY-MM-DD
 our $opt_t; # traffic to, YYYY-MM or YYYY-MM-DD
 our $opt_i; # server number, product id, or address

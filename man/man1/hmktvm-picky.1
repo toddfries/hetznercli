@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 24, 2026
+.Dd November 25, 2026
 .Dt HMKTVM-PICKY 1
 .Os
 .Sh NAME
@@ -35,21 +35,28 @@ once with
 overrides that path.
 Extra arguments are appended.
 .Pp
-The search is
-.Fl M Cm 64 ,
-.Fl o Cm disk.count.min=2 ,
-.Fl o Cm disk.min=8000 ,
-.Fl o Cm price.max=35 ,
-.Fl o Cm format=price ,
-.Fl o Cm re=ECC ,
+The search is one
+.Fl o
+with
+.Cm format=price ,
+.Cm mem.min=64 ,
+.Cm disk.count.min=2 ,
+.Cm disk.min=8000 ,
+.Cm price.max=35 ,
+.Cm re=ECC ,
 and
-.Fl o Cm re=ENT .
+.Cm re=ENT .
 The label is
 .Dq 2disk 8gb storage <=$35 >=64G ram .
+.Pp
 The label says dollars.
 .Cm price.max
 is the monthly price in euros.
+.Pp
 8000 is total gigabytes.
+.Pp
+.Cm mem.min
+is the RAM floor in gigabytes.
 Both patterns must match.
 .Sh EXIT STATUS
 The exit status is the status of

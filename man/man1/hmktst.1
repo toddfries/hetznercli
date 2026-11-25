@@ -37,29 +37,33 @@ overrides that path.
 Extra arguments are appended to every call.
 Each call uses the cached auction list when it is still fresh.
 .Pp
-Each search passes
-.Fl o Cm format=price ,
-.Fl o Cm re=ECC ,
-and
-.Fl o Cm re=ENT .
+Each search passes one
+.Fl o
+starting with
+.Cm format=price,re=ECC,re=ENT
+and the extra pairs below.
 Both patterns must match.
+.Pp
 A row needs ECC and ENT in the disk, CPU, or description text.
 .Pp
 The five searches, in order:
 .Bl -tag -width "Storage min 40g price max 100" -compact
 .It Storage min 40g price max 100
-.Fl o Cm disk.min=40000
-.Fl o Cm price.max=100
+.Cm disk.min=40000
+and
+.Cm price.max=100
 .It Storage min 27g price max 80
-.Fl o Cm disk.min=27000
-.Fl o Cm price.max=80
+.Cm disk.min=27000
+and
+.Cm price.max=80
 .It Disk count min 5 price max 80
-.Fl o Cm disk.count.min=5
-.Fl o Cm price.max=80
+.Cm disk.count.min=5
+and
+.Cm price.max=80
 .It Lotta disk cheap
-.Fl o Cm disk.min=80000
+.Cm disk.min=80000
 .It Lucky draw: 7 disk min
-.Fl o Cm disk.count.min=7
+.Cm disk.count.min=7
 .El
 .Pp
 .Cm disk.min

@@ -174,6 +174,26 @@ is($tighter->{price_max}, 15, 'a later price maximum only falls');
 ok(Hetznercli::Market::parse_opts('disk=200:100')->{error},
 	'a backward disk range is refused');
 
+my $memr = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('mem=24:64'), {});
+ok(!$memr->{error}, 'a mem range parses') or diag($memr->{error});
+ok(Hetznercli::Market::keep({ memory_size => 24 }, $memr->{keep}),
+	'mem 24 is inside the range');
+ok(Hetznercli::Market::keep({ memory_size => 64 }, $memr->{keep}),
+	'mem 64 is inside the range');
+ok(!Hetznercli::Market::keep({ memory_size => 23 }, $memr->{keep}),
+	'mem 23 is below the range');
+ok(!Hetznercli::Market::keep({ memory_size => 65 }, $memr->{keep}),
+	'mem 65 is above the range');
+my $mtight = Hetznercli::Market::parse_opts(
+	'mem.min=16', 'mem.min=32', 'mem.max=128', 'mem.max=64');
+is($mtight->{mem_min}, 32, 'a later mem minimum only rises');
+is($mtight->{mem_max}, 64, 'a later mem maximum only falls');
+ok(Hetznercli::Market::parse_opts('mem=64:16')->{error},
+	'a backward mem range is refused');
+ok(Hetznercli::Market::parse_opts('mem.min=64,mem.max=32')->{error},
+	'comma form still refuses mem min above max');
+
 my $both = Hetznercli::Market::parse_opts('re=ECC', 're=ENT');
 ok(Hetznercli::Market::keep($p, $both), 'ECC and ENT both match the fixture');
 ok(!Hetznercli::Market::keep({ %$p, hdd_text => 'ECC desktop', description => [] }, $both),
@@ -184,6 +204,21 @@ ok(Hetznercli::Market::keep({ %$p, hdd_text => 'desktop ECC', description => [] 
 ok(Hetznercli::Market::parse_opts('re=(')->{error}, 'a broken re is refused');
 like(Hetznercli::Market::parse_opts('format=custom:%s')->{error},
 	qr/not implemented/, 'custom format is reserved');
+
+my $csv = Hetznercli::Market::parse_opts(
+	'format=price,disk.min=4096,re=ECC,re=ENT');
+ok(!$csv->{error}, 'comma-separated -o pairs parse') or diag($csv->{error});
+is($csv->{format}, 'price', 'comma form sets format');
+is($csv->{disk_min}, 4096, 'comma form sets disk.min');
+is(scalar @{ $csv->{re} }, 2, 'comma form keeps two AND patterns');
+ok(Hetznercli::Market::keep($p, $csv), 're=ECC,re=ENT still requires both');
+ok(!Hetznercli::Market::keep({ %$p, hdd_text => 'ECC desktop', description => [] }, $csv),
+	'comma form still drops a row that misses ENT');
+my $inre = Hetznercli::Market::parse_opts('re=foo,bar');
+ok(!$inre->{error}, 'a comma inside a regex parses') or diag($inre->{error});
+is(scalar @{ $inre->{re} }, 1, 'a comma in a regex stays in the pattern');
+ok(Hetznercli::Market::keep({ hdd_text => 'foo,bar', cpu => '', description => [] }, $inre),
+	'the regex with a comma matches that haystack');
 
 my $priced = Hetznercli::Market::format_price([$p], $now);
 like($priced, qr/ServerID\s+GB\s+GB\s+Price/, 'price format uses the hmarket header');
@@ -211,6 +246,14 @@ ok(Hetznercli::Market::merge_cli(
 	Hetznercli::Market::parse_opts('disk.max=1000'),
 	{ disk => 4096 })->{error},
 	'a CLI floor above disk.max is refused');
+my $mraised = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('mem.min=16', 'mem.max=128'),
+	{ mem => 48 });
+is($mraised->{keep}{mem}, 48, 'the CLI RAM floor wins when it is higher');
+ok(Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('mem.max=32'),
+	{ mem => 48 })->{error},
+	'a CLI RAM floor above mem.max is refused');
 
 my $by_tb = Hetznercli::Market::sort_products([
 	{ id => 2, price => 20, hdd_count => 1, hdd_size => 1024 },
@@ -271,10 +314,11 @@ foreach my $sh (qw(hmktst hmktvm hmktvm-picky)) {
 	my $body = <$fh>;
 	close $fh;
 	unlike($body, qr/hmarket/, "$sh does not call hmarket");
+	unlike($body, qr/(?:^|\s)-O(?:\s|=|$)/m, "$sh does not use deprecated -O");
 	like($body, qr/-p market\b/, "$sh calls hcli market");
 	like($body, qr/format=price/, "$sh asks for the price table");
-	like($body, qr/re=ECC/, "$sh requires ECC");
-	like($body, qr/re=ENT/, "$sh requires ENT");
+	like($body, qr/re=ECC,re=ENT/, "$sh ANDs ECC and ENT in one -o");
+	like($body, qr/-o [^\n]+,/, "$sh collapses -o pairs with commas");
 }
 
 done_testing();

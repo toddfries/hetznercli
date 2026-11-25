@@ -56,6 +56,7 @@ sub keep {
 	my $price = _num($product->{price});
 	return 0 if defined($min->{cpu}) && _num($product->{cpu_benchmark}) < $min->{cpu};
 	return 0 if defined($min->{mem}) && _num($product->{memory_size}) < $min->{mem};
+	return 0 if defined($min->{mem_max}) && _num($product->{memory_size}) > $min->{mem_max};
 	return 0 if defined($min->{disk}) && $disk < $min->{disk};
 	return 0 if defined($min->{disk_max}) && $disk > $min->{disk_max};
 	return 0 if defined($min->{count_min}) && $count < $min->{count_min};
@@ -92,7 +93,8 @@ sub _range {
 	return ($1 + 0, $2 + 0);
 }
 
-# Repeated -o key=value. A later minimum only rises. A later maximum only falls.
+# Repeated -o key=value. Commas split pairs when the next token is key=.
+# A later minimum only rises. A later maximum only falls.
 # format=custom is recognized and refused.
 sub parse_opts {
 	my (@spec) = @_;
@@ -100,8 +102,22 @@ sub parse_opts {
 		format => 'full',
 		re => [],
 	};
+	my @flat;
 	foreach my $one (@spec) {
-		if (!defined($one) || $one !~ /\A([^=]+)=(.*)\z/s) {
+		if (!defined($one) || $one eq '') {
+			return { error => 'option needs key=value' };
+		}
+		foreach my $part (split /,(?=[^=,]+=)/, $one) {
+			$part =~ s/\A\s+//;
+			$part =~ s/\s+\z//;
+			if ($part eq '') {
+				return { error => 'option needs key=value' };
+			}
+			push @flat, $part;
+		}
+	}
+	foreach my $one (@flat) {
+		if ($one !~ /\A([^=]+)=(.*)\z/s) {
 			return { error => 'option needs key=value' };
 		}
 		my ($key, $val) = ($1, $2);
@@ -139,6 +155,7 @@ sub parse_opts {
 			next;
 		}
 		if ($key eq 'disk.min' || $key eq 'disk.max' || $key eq 'disk'
+			|| $key eq 'mem.min' || $key eq 'mem.max' || $key eq 'mem'
 			|| $key eq 'price.min' || $key eq 'price.max' || $key eq 'price'
 			|| $key eq 'disk.count.min' || $key eq 'disk.count.max'
 			|| $key eq 'disk.count') {
@@ -153,11 +170,16 @@ sub parse_opts {
 				($min, $max) = _range($val);
 				return { error => "$key needs MIN:MAX" } if !defined($min);
 			}
-			my ($minkey, $maxkey) = ($key =~ /\Adisk\.count/)
-				? ('count_min', 'count_max')
-				: ($key =~ /\Aprice/)
-				? ('price_min', 'price_max')
-				: ('disk_min', 'disk_max');
+			my ($minkey, $maxkey);
+			if ($key =~ /\Adisk\.count/) {
+				($minkey, $maxkey) = ('count_min', 'count_max');
+			} elsif ($key =~ /\Aprice/) {
+				($minkey, $maxkey) = ('price_min', 'price_max');
+			} elsif ($key =~ /\Amem/) {
+				($minkey, $maxkey) = ('mem_min', 'mem_max');
+			} else {
+				($minkey, $maxkey) = ('disk_min', 'disk_max');
+			}
 			_raise_min($out, $minkey, $min) if defined($min);
 			_lower_max($out, $maxkey, $max) if defined($max);
 			next;
@@ -167,6 +189,10 @@ sub parse_opts {
 	if (defined($out->{disk_min}) && defined($out->{disk_max})
 		&& $out->{disk_min} > $out->{disk_max}) {
 		return { error => 'disk min is above disk max' };
+	}
+	if (defined($out->{mem_min}) && defined($out->{mem_max})
+		&& $out->{mem_min} > $out->{mem_max}) {
+		return { error => 'mem min is above mem max' };
 	}
 	if (defined($out->{count_min}) && defined($out->{count_max})
 		&& $out->{count_min} > $out->{count_max}) {
@@ -179,7 +205,8 @@ sub parse_opts {
 	return $out;
 }
 
-# -D raises disk.min. The other CLI floors are copied when set.
+# -D raises disk.min. -M raises mem.min. The other CLI floors are copied when set.
+# -O fills sort when -o sort is absent.
 sub merge_cli {
 	my ($opts, $cli) = @_;
 	return { error => 'missing options' } if ref($opts) ne 'HASH';
@@ -193,6 +220,14 @@ sub merge_cli {
 	if (defined($disk) && defined($opts->{disk_max}) && $disk > $opts->{disk_max}) {
 		return { error => 'disk min is above disk max' };
 	}
+	my $mem = $opts->{mem_min};
+	if (defined($cli->{mem}) && $cli->{mem} ne '') {
+		my $n = _num($cli->{mem});
+		$mem = $n if !defined($mem) || $n > $mem;
+	}
+	if (defined($mem) && defined($opts->{mem_max}) && $mem > $opts->{mem_max}) {
+		return { error => 'mem min is above mem max' };
+	}
 	my $sort = $opts->{sort};
 	if (!defined($sort) || $sort eq '') {
 		$sort = $cli->{sort} if defined($cli->{sort}) && $cli->{sort} ne '';
@@ -202,7 +237,8 @@ sub merge_cli {
 		sort => $sort,
 		keep => {
 			cpu => (defined($cli->{cpu}) && $cli->{cpu} ne '') ? $cli->{cpu} : undef,
-			mem => (defined($cli->{mem}) && $cli->{mem} ne '') ? $cli->{mem} : undef,
+			mem => $mem,
+			mem_max => $opts->{mem_max},
 			disk => $disk,
 			disk_max => $opts->{disk_max},
 			count_min => $opts->{count_min},

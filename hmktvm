@@ -2,16 +2,10 @@
 hcli=${HCLI:-$HOME/bin/hcli}
 
 echo "2disk 8gb storage <=\$50 >=64G ram"
-$hcli -p market -M 64 -o format=price \
-	-o disk.count.min=2 -o disk.min=8000 -o price.max=50 \
-	-o re=ECC -o re=ENT "$@"
+$hcli -p market -o format=price,mem.min=64,disk.count.min=2,disk.min=8000,price.max=50,re=ECC,re=ENT "$@"
 
 echo "2disk 4gb storage <=\$40 >=64G ram"
-$hcli -p market -M 64 -o format=price \
-	-o disk.count.min=2 -o disk.min=4000 -o price.max=40 \
-	-o re=ECC -o re=ENT "$@"
+$hcli -p market -o format=price,mem.min=64,disk.count.min=2,disk.min=4000,price.max=40,re=ECC,re=ENT "$@"
 
 echo "2disk 8gb storage <=\$72 >=128G ram"
-$hcli -p market -M 128 -o format=price \
-	-o disk.count.min=2 -o disk.min=8000 -o price.max=72 \
-	-o re=ECC -o re=ENT "$@"
+$hcli -p market -o format=price,mem.min=128,disk.count.min=2,disk.min=8000,price.max=72,re=ECC,re=ENT "$@"

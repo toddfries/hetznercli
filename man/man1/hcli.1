@@ -237,6 +237,9 @@ and
 defaults to 48.
 .Cm market
 applies it only when the flag is set.
+.Pp
+A higher value raises
+.Cm mem.min .
 .It Fl n Ar name
 PTR name for
 .Cm rdns_set ,
@@ -244,6 +247,17 @@ or the short host name for
 .Cm bring_online .
 .It Fl o Ar key=value
 Repeatable auction option.
+One
+.Fl o
+may list several
+.Cm key=value
+pairs separated by commas.
+.Pp
+.Fl o Cm re=ECC,re=ENT
+is two required patterns.
+A comma that is not followed by
+.Cm key=
+stays in the value.
 Only
 .Cm market
 and
@@ -299,6 +313,11 @@ A later maximum only falls.
 .It Cm disk.count Ns = Ns Ar min:max
 Disk count, inclusive.
 The same later-bound rule applies.
+.It Cm mem.min Ns = Ns Ar n
+.It Cm mem.max Ns = Ns Ar n
+.It Cm mem Ns = Ns Ar min:max
+RAM gigabytes, inclusive.
+The same later-bound rule applies.
 .It Cm price.min Ns = Ns Ar eur
 .It Cm price.max Ns = Ns Ar eur
 .It Cm price Ns = Ns Ar min:max
@@ -311,6 +330,7 @@ must match.
 A later
 .Fl o Cm re
 adds another required pattern.
+.Pp
 .Xr hmktvm 1
 passes
 .Cm ECC
@@ -373,8 +393,13 @@ A smaller
 .Cm disk.min
 does not lower
 .Fl D .
+.Pp
+.Fl M
+raises
+.Cm mem.min
+the same way.
 .It Fl O Ar order
-Same as
+Deprecated alias for
 .Fl o Cm sort= Ns Ar order
 when no
 .Fl o Cm sort
@@ -639,7 +664,7 @@ Auction table, columns fitted to this download:
 .Pp
 Same list in the fixed price table, with both tags required:
 .Pp
-.Dl ~/bin/hcli -p market -o format=price -o re=ECC -o re=ENT
+.Dl ~/bin/hcli -p market -o format=price,re=ECC,re=ENT
 .Pp
 Cheapest tebibyte first:
 .Pp
