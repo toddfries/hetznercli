@@ -18,6 +18,8 @@ use strict;
 use warnings;
 
 use POSIX qw(strftime);
+use File::Path qw(make_path);
+use JSON::PP ();
 
 sub _num {
 	my ($v) = @_;
@@ -113,6 +115,18 @@ sub parse_opts {
 			}
 			return { error => "unknown format $val" };
 		}
+		if ($key eq 'sort') {
+			if ($val eq '') {
+				return { error => 'sort needs a field' };
+			}
+			my $name = $val;
+			$name =~ s/\A-//;
+			if (!defined(_sort_field($name))) {
+				return { error => "unknown sort $val" };
+			}
+			$out->{sort} = $val;
+			next;
+		}
 		if ($key eq 're') {
 			if ($val eq '') {
 				return { error => 're needs a pattern' };
@@ -179,8 +193,13 @@ sub merge_cli {
 	if (defined($disk) && defined($opts->{disk_max}) && $disk > $opts->{disk_max}) {
 		return { error => 'disk min is above disk max' };
 	}
+	my $sort = $opts->{sort};
+	if (!defined($sort) || $sort eq '') {
+		$sort = $cli->{sort} if defined($cli->{sort}) && $cli->{sort} ne '';
+	}
 	return {
 		format => $opts->{format},
+		sort => $sort,
 		keep => {
 			cpu => (defined($cli->{cpu}) && $cli->{cpu} ne '') ? $cli->{cpu} : undef,
 			mem => (defined($cli->{mem}) && $cli->{mem} ne '') ? $cli->{mem} : undef,
@@ -273,9 +292,9 @@ sub format_price {
 	$products = [] if ref($products) ne 'ARRAY';
 	$now = time() if !defined($now);
 	my $text = "\n"
-		. "                  HDD HDD        Price\n"
-		. "           Ram   Size  Ct          Per  ,--Next Adjust-------------------.\n"
-		. " ServerID   GB     GB     Price     TB Day HH:MM:SS     Date     Time\n";
+		. "                  HDD HDD         Price\n"
+		. "           Ram   Size  Ct          Per    ,--Next Adjust-------------------.\n"
+		. " ServerID   GB     GB     Price     TB   Day HH:MM:SS     Date     Time\n";
 	foreach my $product (@{ $products }) {
 		next if ref($product) ne 'HASH';
 		my $count = _num($product->{hdd_count});
@@ -301,7 +320,7 @@ sub format_price {
 			$when = '       fixed';
 		}
 		my $tail = ($aka ne '') ? "$when aka $aka" : $when;
-		$text .= sprintf("%9d %4d %6d %2d %6s %6.3f %s\n",
+		$text .= sprintf("%9d %4d %6d %2d %6s %7.3f %s\n",
 			_num($product->{id}),
 			_num($product->{memory_size}),
 			$gb,
@@ -428,6 +447,181 @@ sub recommend_key {
 		return $k if ($k->{type} || '') eq 'ED25519';
 	}
 	return $keys->[0];
+}
+
+sub _product {
+	my ($row) = @_;
+	return $row->{product} if ref($row) eq 'HASH' && ref($row->{product}) eq 'HASH';
+	return $row if ref($row) eq 'HASH';
+	return;
+}
+
+sub _sort_field {
+	my ($name) = @_;
+	return unless defined($name) && $name ne '';
+	$name = lc $name;
+	my %alias = (
+		price => 'price',
+		mem => 'mem',
+		memory => 'mem',
+		memory_size => 'mem',
+		'eur/tb' => 'eur/tb',
+		eur_tb => 'eur/tb',
+		tb => 'eur/tb',
+		price_per_tb => 'eur/tb',
+		cost_per_tb => 'eur/tb',
+		'cost/tb' => 'eur/tb',
+		disk => 'disk',
+		'disk.count' => 'count',
+		count => 'count',
+		bench => 'bench',
+		cpu_benchmark => 'bench',
+		id => 'id',
+		prodid => 'id',
+		next => 'next',
+		next_reduce => 'next',
+		dc => 'dc',
+		datacenter => 'dc',
+		cpu => 'cpu',
+		name => 'name',
+		sys => 'name',
+	);
+	return $alias{$name};
+}
+
+sub _sort_num {
+	my ($product, $field) = @_;
+	return _num($product->{price}) if $field eq 'price';
+	return _num($product->{memory_size}) if $field eq 'mem';
+	return _num($product->{hdd_count}) * _num($product->{hdd_size})
+		if $field eq 'disk';
+	return _num($product->{hdd_count}) if $field eq 'count';
+	return _num($product->{cpu_benchmark}) if $field eq 'bench';
+	return _num($product->{id}) if $field eq 'id';
+	return _num($product->{next_reduce}) if $field eq 'next';
+	return;
+}
+
+sub _sort_str {
+	my ($product, $field) = @_;
+	return defined($product->{datacenter}) ? $product->{datacenter} : ''
+		if $field eq 'dc';
+	return defined($product->{cpu}) ? $product->{cpu} : '' if $field eq 'cpu';
+	return defined($product->{name}) ? $product->{name} : '' if $field eq 'name';
+	return;
+}
+
+sub sort_products {
+	my ($products, $spec) = @_;
+	$products = [] if ref($products) ne 'ARRAY';
+	return [ @{ $products } ] if !defined($spec) || $spec eq '';
+	my $desc = 0;
+	my $name = $spec;
+	if ($name =~ /\A-(.+)\z/) {
+		$desc = 1;
+		$name = $1;
+	}
+	my $field = _sort_field($name);
+	return { error => "unknown sort $spec" } if !defined($field);
+	my @rows = @{ $products };
+	@rows = sort {
+		my $pa = _product($a) || {};
+		my $pb = _product($b) || {};
+		my $cmp;
+		if ($field eq 'eur/tb') {
+			my $ra = price_per_tb($pa);
+			my $rb = price_per_tb($pb);
+			my $ma = defined($ra) ? 0 : 1;
+			my $mb = defined($rb) ? 0 : 1;
+			$cmp = ($ma <=> $mb) || (($ra // 0) <=> ($rb // 0));
+		} elsif ($field eq 'dc' || $field eq 'cpu' || $field eq 'name') {
+			$cmp = _sort_str($pa, $field) cmp _sort_str($pb, $field);
+		} else {
+			$cmp = _sort_num($pa, $field) <=> _sort_num($pb, $field);
+		}
+		$desc ? -$cmp : $cmp;
+	} @rows;
+	return \@rows;
+}
+
+# Seconds the cached list stays usable: the sooner of 30 minutes and the
+# soonest next_reduce timer reaching zero.
+sub cache_ttl {
+	my ($products) = @_;
+	my $cap = 30 * 60;
+	my $soon;
+	foreach my $row (@{ ref($products) eq 'ARRAY' ? $products : [] }) {
+		my $p = _product($row);
+		next if !$p;
+		my $n = $p->{next_reduce};
+		next if !defined($n) || $n !~ /\A-?\d+\z/;
+		$soon = $n + 0 if !defined($soon) || $n + 0 < $soon;
+	}
+	return $cap if !defined($soon);
+	return 0 if $soon <= 0;
+	return $soon < $cap ? $soon : $cap;
+}
+
+sub cache_dir {
+	my ($override) = @_;
+	return $override if defined($override) && $override ne '';
+	if (defined($ENV{HETZNERCLI_CACHE}) && $ENV{HETZNERCLI_CACHE} ne '') {
+		return $ENV{HETZNERCLI_CACHE};
+	}
+	my $home = defined($ENV{HOME}) ? $ENV{HOME} : '';
+	return "$home/.cache/hetznercli";
+}
+
+sub cache_file {
+	return cache_dir(@_) . '/market.json';
+}
+
+sub cache_load {
+	my ($now, $dir) = @_;
+	$now = time() if !defined($now);
+	my $path = cache_file($dir);
+	open my $fh, '<', $path or return;
+	local $/;
+	my $raw = <$fh>;
+	close $fh;
+	return if !defined($raw) || $raw eq '';
+	my $doc = eval { JSON::PP->new->decode($raw) };
+	return if ref($doc) ne 'HASH';
+	return if !defined($doc->{fetched_at}) || $doc->{fetched_at} !~ /\A\d+\z/;
+	return if ref($doc->{products}) ne 'ARRAY';
+	my $ttl = cache_ttl($doc->{products});
+	return if $now >= $doc->{fetched_at} + $ttl;
+	return $doc->{products};
+}
+
+sub cache_save {
+	my ($products, $now, $dir) = @_;
+	return if ref($products) ne 'ARRAY';
+	$now = time() if !defined($now);
+	my $pathdir = cache_dir($dir);
+	make_path($pathdir, { mode => 0700 });
+	my $path = cache_file($dir);
+	my $tmp = "$path.tmp.$$";
+	my $json = JSON::PP->new->canonical->encode({
+		fetched_at => $now + 0,
+		products => $products,
+	});
+	open my $fh, '>', $tmp or return;
+	if (!print {$fh} $json) {
+		close $fh;
+		unlink $tmp;
+		return;
+	}
+	if (!close $fh) {
+		unlink $tmp;
+		return;
+	}
+	chmod 0600, $tmp;
+	if (!rename $tmp, $path) {
+		unlink $tmp;
+		return;
+	}
+	return 1;
 }
 
 1;

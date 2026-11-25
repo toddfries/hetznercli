@@ -212,6 +212,58 @@ ok(Hetznercli::Market::merge_cli(
 	{ disk => 4096 })->{error},
 	'a CLI floor above disk.max is refused');
 
+my $by_tb = Hetznercli::Market::sort_products([
+	{ id => 2, price => 20, hdd_count => 1, hdd_size => 1024 },
+	{ id => 1, price => 10, hdd_count => 1, hdd_size => 1024 },
+	{ id => 3, price => 1, hdd_count => 0, hdd_size => 0 },
+], 'eur/tb');
+is($by_tb->[0]{id}, 1, 'eur/tb sort puts the cheaper tebibyte first');
+is($by_tb->[1]{id}, 2, 'eur/tb sort keeps the dearer tebibyte second');
+is($by_tb->[2]{id}, 3, 'a row with no disk sorts last');
+my $desc = Hetznercli::Market::sort_products([
+	{ id => 1, price => 10 },
+	{ id => 2, price => 20 },
+], '-price');
+is($desc->[0]{id}, 2, 'a leading minus sorts high price first');
+is(Hetznercli::Market::parse_opts('sort=cost_per_tb')->{sort}, 'cost_per_tb',
+	'cost_per_tb is a sort alias');
+is(Hetznercli::Market::parse_opts('sort=price', 'sort=mem')->{sort}, 'mem',
+	'a later sort replaces an earlier one');
+ok(Hetznercli::Market::parse_opts('sort=nope')->{error}, 'an unknown sort is refused');
+my $from_O = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts(),
+	{ sort => 'mem' });
+is($from_O->{sort}, 'mem', 'CLI -O fills sort when -o sort is absent');
+my $wins = Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('sort=price'),
+	{ sort => 'mem' });
+is($wins->{sort}, 'price', '-o sort wins over -O');
+
+is(Hetznercli::Market::cache_ttl([
+	{ product => { next_reduce => 60 } },
+	{ product => { next_reduce => 4000 } },
+]), 60, 'cache ttl is the soonest timer');
+is(Hetznercli::Market::cache_ttl([
+	{ product => { next_reduce => 4000 } },
+]), 1800, 'cache ttl caps at 30 minutes');
+is(Hetznercli::Market::cache_ttl([
+	{ product => { next_reduce => 0 } },
+]), 0, 'a timer at zero makes the cache expire');
+is(Hetznercli::Market::cache_ttl([{}]), 1800,
+	'a list with no timer uses 30 minutes');
+
+my $cachedir = "/tmp/hcli-cache-$$";
+mkdir $cachedir, 0700 or die "mkdir $cachedir: $!";
+my $payload = [{ product => { id => 7, next_reduce => 120 } }];
+ok(Hetznercli::Market::cache_save($payload, 1_700_000_000, $cachedir),
+	'the market list is written to the cache');
+my $hit = Hetznercli::Market::cache_load(1_700_000_010, $cachedir);
+ok($hit && $hit->[0]{product}{id} == 7, 'a fresh cache is reused');
+ok(!Hetznercli::Market::cache_load(1_700_000_130, $cachedir),
+	'the cache expires when the timer would reach zero');
+unlink Hetznercli::Market::cache_file($cachedir);
+rmdir $cachedir;
+
 my $preset = $ENV{HOME} . '/git/sw/hetznercli';
 foreach my $sh (qw(hmktst hmktvm hmktvm-picky)) {
 	open my $fh, '<', "$preset/$sh" or die "open $sh: $!";

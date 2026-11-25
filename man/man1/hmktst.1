@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 24, 2026
+.Dd November 25, 2026
 .Dt HMKTST 1
 .Os
 .Sh NAME
@@ -35,7 +35,7 @@ and prints a label before each table.
 .Ev HCLI
 overrides that path.
 Extra arguments are appended to every call.
-Each call downloads the auction again.
+Each call uses the cached auction list when it is still fresh.
 .Pp
 Each search passes
 .Fl o Cm format=price ,

@@ -287,46 +287,26 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 	my $opts = Hetznercli::Market::parse_opts(@market_o);
 	my $merged = Hetznercli::Market::merge_cli($opts, {
 		cpu => $opt_C, mem => $opt_M, disk => $opt_D,
+		sort => $opt_O,
 	});
 	if ($merged->{error}) {
 		print "$merged->{error}\n";
 		exit(1);
 	}
-	my $call = "order/server_market/product";
-	if ($filtered) {
-		$argc = 0;
-		if (defined($opt_X) && length($opt_X) > 0) {
-			$call .= addvar('search', $opt_X);
+	my $cached = Hetznercli::Market::cache_load();
+	my @res;
+	if ($cached) {
+		@res = @{ $cached };
+	} else {
+		my $parsed = $hetzner->get("order/server_market/product");
+		api_exit($parsed, "no auction servers");
+		if (ref($parsed) ne "ARRAY") {
+			print "parsed is a ".ref($parsed)." and contains: ";
+			print Dumper($parsed);
+			exit(1);
 		}
-		if (defined($opt_C)) {
-			$call .= addvar('min_cpu_benchmark', $opt_C);
-		}
-		if (defined($opt_M)) {
-			$call .= addvar('min_memory_size', $opt_M);
-		}
-	}
-	my $parsed = $hetzner->get($call);
-	api_exit($parsed, "no auction servers");
-	if (ref($parsed) ne "ARRAY") {
-		print "parsed is a ".ref($parsed)." and contains: ";
-		print Dumper($parsed);
-		exit(1);
-	}
-	my @res = @{ $parsed };
-	if (defined($opt_O)) {
-		if ($opt_O eq "mem") {
-			@res = sort {
-				($a->{product}->{memory_size} // 0) <=>
-				($b->{product}->{memory_size} // 0)
-			} @res;
-		} elsif ($opt_O eq "price") {
-			@res = sort {
-				($a->{product}->{price} // 0) <=>
-				($b->{product}->{price} // 0)
-			} @res;
-		} else {
-			print "market_search: unhandled sort type ${opt_O}\n";
-		}
+		@res = @{ $parsed };
+		Hetznercli::Market::cache_save(\@res);
 	}
 	my @shown;
 	foreach my $server (@res) {
@@ -335,6 +315,13 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 		next if ref($product) ne "HASH";
 		next if !Hetznercli::Market::keep($product, $merged->{keep});
 		push @shown, $product;
+	}
+	my $sorted = Hetznercli::Market::sort_products(\@shown, $merged->{sort});
+	if (ref($sorted) eq 'HASH' && $sorted->{error}) {
+		print "$sorted->{error}\n";
+		exit(1) if defined($opts->{sort});
+	} else {
+		@shown = @{ $sorted };
 	}
 	if ($merged->{format} eq 'price') {
 		print Hetznercli::Market::format_price(\@shown);

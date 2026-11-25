@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd November 24, 2026
+.Dd November 25, 2026
 .Dt HCLI 1
 .Os
 .Sh NAME
@@ -102,8 +102,16 @@ The auction list is not printed while the download arrives.
 .Fl p Cm market
 and
 .Fl p Cm market_search
-download the whole product list, drop rows that miss a
-set floor, and then print.
+read
+.Pa ~/.cache/hetznercli/market.json
+when it is still fresh, otherwise download the whole
+product list and store it there.
+The file lasts until the sooner of 30 minutes and the
+soonest
+.Va next_reduce
+timer reaching zero.
+Rows that miss a set floor are then dropped, and the
+table is printed.
 The default format measures each column from the rows
 that remain.
 The next run measures again.
@@ -300,11 +308,47 @@ A Perl regular expression.
 Every
 .Cm re
 must match.
-One pattern may use
-.Ql |
-as or.
+A later
+.Fl o Cm re
+adds another required pattern.
+.Xr hmktvm 1
+passes
+.Cm ECC
+and
+.Cm ENT
+this way so a row needs both tags.
+A bar inside one pattern is or.
 The searched text is the disk line, the CPU line, and the
 description.
+.It Cm sort Ns = Ns Ar field
+Sort the printed rows.
+A later
+.Cm sort
+replaces an earlier one.
+A leading minus reverses the order.
+The numeric fields are
+.Cm price ,
+.Cm mem ,
+.Cm eur/tb ,
+.Cm disk ,
+.Cm disk.count ,
+.Cm bench ,
+.Cm id ,
+and
+.Cm next .
+.Cm eur/tb
+is monthly euros per tebibyte of disk.
+Aliases include
+.Cm cost_per_tb
+and
+.Cm price_per_tb .
+A row with no disk sorts last on
+.Cm eur/tb .
+The text fields are
+.Cm dc ,
+.Cm cpu ,
+and
+.Cm name .
 .El
 An unknown key prints
 .Ql unknown option
@@ -330,16 +374,17 @@ A smaller
 does not lower
 .Fl D .
 .It Fl O Ar order
-Sort the auction table.
+Same as
+.Fl o Cm sort= Ns Ar order
+when no
+.Fl o Cm sort
+is set.
 .Cm mem
-sorts by RAM.
-.Cm price
-sorts by monthly price.
-Any other word prints an error and the table stays in download order.
-Honored by
-.Cm market
 and
-.Cm market_search .
+.Cm price
+are the old names.
+.Fl o Cm sort
+wins when both are given.
 .It Fl p Ar personality
 Which Robot call to make.
 Required.
@@ -370,14 +415,11 @@ Interface name for the
 NIC pin, such as
 .Ql eno2 .
 .It Fl X Ar text
-Sent as
-.Ql search=
-on a
-.Cm market_search
-download.
+Accepted on
+.Cm market_search .
 The default is
 .Cm Ent .
-Robot ignores this parameter, and it is not applied to CPU or disk text.
+It is not sent on the download, and it is not applied to CPU or disk text.
 .El
 .Sh PERSONALITIES
 .Bl -tag -width "market_transactions"
@@ -473,8 +515,7 @@ Those floors default to 5682, 4096, and 48.
 bounds apply as well.
 The count line is omitted.
 .Fl X
-is still sent on the download.
-It is not matched against CPU or disk text.
+is accepted and is not matched against CPU or disk text.
 .It Cm market_show
 Print one auction server: id, name, datacenter, CPU and
 benchmark, RAM, disks, description, monthly, hourly, and
@@ -576,6 +617,9 @@ The hash is not printed.
 .It Pa ~/.ssh/config
 Appended only after a yes on
 .Cm bring_online .
+.It Pa ~/.cache/hetznercli/market.json
+Cached auction list.
+Mode 600.
 .El
 .Sh EXIT STATUS
 .Ex -std hcli
@@ -596,6 +640,10 @@ Auction table, columns fitted to this download:
 Same list in the fixed price table, with both tags required:
 .Pp
 .Dl ~/bin/hcli -p market -o format=price -o re=ECC -o re=ENT
+.Pp
+Cheapest tebibyte first:
+.Pp
+.Dl ~/bin/hcli -p market -o sort=eur/tb
 .Pp
 One auction server:
 .Pp
