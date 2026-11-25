@@ -143,6 +143,13 @@ sub parse_opts {
 			$out->{sort} = $val;
 			next;
 		}
+		if ($key eq 'top') {
+			if ($val eq '' || $val !~ /\A[1-9]\d*\z/) {
+				return { error => 'top needs a number' };
+			}
+			$out->{top} = $val + 0;
+			next;
+		}
 		if ($key eq 're') {
 			if ($val eq '') {
 				return { error => 're needs a pattern' };
@@ -235,6 +242,7 @@ sub merge_cli {
 	return {
 		format => $opts->{format},
 		sort => $sort,
+		top => $opts->{top},
 		keep => {
 			cpu => (defined($cli->{cpu}) && $cli->{cpu} ne '') ? $cli->{cpu} : undef,
 			mem => $mem,
@@ -578,6 +586,15 @@ sub sort_products {
 		$desc ? -$cmp : $cmp;
 	} @rows;
 	return \@rows;
+}
+
+# First n rows of the already filtered and sorted list.
+sub take_top {
+	my ($products, $n) = @_;
+	$products = [] if ref($products) ne 'ARRAY';
+	return [ @{ $products } ] if !defined($n);
+	return [ @{ $products } ] if $n >= @{ $products };
+	return [ @{ $products }[0 .. $n - 1] ];
 }
 
 # Seconds the cached list stays usable: the sooner of 30 minutes and the

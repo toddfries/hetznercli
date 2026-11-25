@@ -282,6 +282,26 @@ my $wins = Hetznercli::Market::merge_cli(
 	{ sort => 'mem' });
 is($wins->{sort}, 'price', '-o sort wins over -O');
 
+my $top = Hetznercli::Market::parse_opts('top=5');
+is($top->{top}, 5, 'top parses a count');
+is(Hetznercli::Market::parse_opts('top=10', 'top=5')->{top}, 5,
+	'a later top replaces an earlier one');
+ok(Hetznercli::Market::parse_opts('top=0')->{error}, 'top=0 is refused');
+ok(Hetznercli::Market::parse_opts('top=nope')->{error}, 'a non-number top is refused');
+is(Hetznercli::Market::merge_cli(
+	Hetznercli::Market::parse_opts('format=price,sort=mem,top=5'),
+	{})->{top}, 5, 'comma form carries top');
+my $cut = Hetznercli::Market::take_top([
+	{ id => 1 }, { id => 2 }, { id => 3 }, { id => 4 }, { id => 5 }, { id => 6 },
+], 5);
+is(scalar @$cut, 5, 'top=5 keeps five rows');
+is($cut->[0]{id}, 1, 'top keeps the first row');
+is($cut->[4]{id}, 5, 'top keeps the fifth row');
+is(scalar @{ Hetznercli::Market::take_top($cut, 9) }, 5,
+	'top larger than the list keeps every row');
+is(scalar @{ Hetznercli::Market::take_top($cut) }, 5,
+	'no top keeps every row');
+
 is(Hetznercli::Market::cache_ttl([
 	{ product => { next_reduce => 60 } },
 	{ product => { next_reduce => 4000 } },

@@ -323,6 +323,7 @@ if($opt_p eq "market" || $opt_p eq "market_search") {
 	} else {
 		@shown = @{ $sorted };
 	}
+	@shown = @{ Hetznercli::Market::take_top(\@shown, $merged->{top}) };
 	if ($merged->{format} eq 'price') {
 		print Hetznercli::Market::format_price(\@shown);
 	} else {

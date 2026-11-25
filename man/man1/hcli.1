@@ -369,6 +369,14 @@ The text fields are
 .Cm cpu ,
 and
 .Cm name .
+.It Cm top Ns = Ns Ar n
+Print only the first
+.Ar n
+rows after filters and sort.
+A later
+.Cm top
+replaces an earlier one.
+The printed count is of the rows shown.
 .El
 An unknown key prints
 .Ql unknown option
@@ -669,6 +677,10 @@ Same list in the fixed price table, with both tags required:
 Cheapest tebibyte first:
 .Pp
 .Dl ~/bin/hcli -p market -o sort=eur/tb
+.Pp
+First five of that order:
+.Pp
+.Dl ~/bin/hcli -p market -o sort=eur/tb,top=5
 .Pp
 One auction server:
 .Pp
