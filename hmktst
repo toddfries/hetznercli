@@ -1,22 +1,35 @@
 #!/bin/sh
 hcli=${HCLI:-$HOME/bin/hcli}
 
-echo "Storage min 40g price max 100"
-$hcli -p market -o format=price,disk.min=40000,price.max=100,re=ECC,re=ENT "$@"
+echo "Storage min EUR/tb"
+$hcli -p market -o format=price,sort=eur/tb,top=10,re=ECC,re=ENT "$@"
 echo
 
-echo "Storage min 27g price max 80"
-$hcli -p market -o format=price,disk.min=27000,price.max=80,re=ECC,re=ENT "$@"
+echo "Storage min 27g"
+$hcli -p market -o format=price,sort=price,disk.min=27000,top=5,re=ECC,re=ENT "$@"
 echo
 
-echo "Disk count min 5 price max 80"
-$hcli -p market -o format=price,disk.count.min=5,price.max=80,re=ECC,re=ENT "$@"
+echo "Storage min 40g"
+$hcli -p market -o format=price,sort=price,disk.min=40000,re=ECC,re=ENT,top=5 "$@"
 echo
 
-echo "Lotta disk cheap"
-$hcli -p market -o format=price,disk.min=80000,re=ECC,re=ENT "$@"
+echo "Storage min 80g"
+$hcli -p market -o format=price,sort=price,disk.min=80000,re=ECC,re=ENT,top=5 "$@"
 echo
 
-echo "Lucky draw: 7 disk min"
-$hcli -p market -o format=price,disk.count.min=7,re=ECC,re=ENT "$@"
+echo "Storage min 120g"
+$hcli -p market -o format=price,sort=price,disk.min=120000,re=ECC,re=ENT,top=5 "$@"
 echo
+
+echo "Disk count min 5"
+$hcli -p market -o format=price,sort=price,top=5,disk.count.min=5,re=ECC,re=ENT "$@"
+echo
+
+echo "Disk count min 6"
+$hcli -p market -o format=price,sort=price,top=5,disk.count.min=6,re=ECC,re=ENT "$@"
+echo
+
+echo "Disk count min 7"
+$hcli -p market -o format=price,sort=price,top=5,disk.count.min=7,re=ECC,re=ENT "$@"
+echo
+

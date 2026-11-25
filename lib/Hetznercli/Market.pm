@@ -364,7 +364,7 @@ sub format_price {
 			$when = '       fixed';
 		}
 		my $tail = ($aka ne '') ? "$when aka $aka" : $when;
-		$text .= sprintf("%9d %4d %6d %2d %6s %7.3f %s\n",
+		$text .= sprintf("%9d %4d %6d %2d %6s %9.3f %s\n",
 			_num($product->{id}),
 			_num($product->{memory_size}),
 			$gb,
